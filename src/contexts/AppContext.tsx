@@ -20,6 +20,9 @@ interface AppContextType {
   addQuickTime: (minutes: number) => void;
   addRetroEntry: (projectId: string | undefined, startAt: Date, endAt: Date | null, note?: string) => void;
   fixForgotPause: (minutesAgo: number, action: 'end' | 'resume') => void;
+  fixForgotStop: (minutesAgo: number) => void;
+  updateEntry: (id: string, updates: Partial<Pick<TimeEntry, 'projectId' | 'startAt' | 'endAt' | 'note'>>) => void;
+  updateActiveProject: (projectId?: string) => void;
   todayTotalMinutes: number;
   deleteEntry: (id: string) => void;
   getProject: (id?: string) => Project | undefined;
@@ -166,8 +169,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addQuickTime = useCallback((minutes: number) => {
     const end = new Date();
     const start = new Date(end.getTime() - minutes * 60000);
+    // Use last used project
+    const sorted = [...entries].filter(e => e.projectId).sort((a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    const lastProjectId = sorted[0]?.projectId;
     const entry: TimeEntry = {
       id: crypto.randomUUID(),
+      projectId: lastProjectId,
       startAt: start.toISOString(),
       endAt: end.toISOString(),
       pauses: [],
@@ -175,7 +184,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString(),
     };
     setEntries(prev => [...prev, entry]);
-  }, []);
+  }, [entries]);
 
   const addRetroEntry = useCallback((projectId: string | undefined, startAt: Date, endAt: Date | null, note?: string) => {
     const entry: TimeEntry = {
@@ -214,6 +223,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setEntries(prev => prev.filter(e => e.id !== id));
   }, []);
 
+  const fixForgotStop = useCallback((minutesAgo: number) => {
+    if (!activeEntry) return;
+    const endTime = new Date(Date.now() - minutesAgo * 60000);
+    setEntries(prev => prev.map(e => {
+      if (e.id !== activeEntry.id) return e;
+      // Close any open pauses
+      const pauses = e.pauses.map(p =>
+        p.pauseEnd ? p : { ...p, pauseEnd: endTime.toISOString() }
+      );
+      return { ...e, pauses, endAt: endTime.toISOString() };
+    }));
+  }, [activeEntry]);
+
+  const updateEntry = useCallback((id: string, updates: Partial<Pick<TimeEntry, 'projectId' | 'startAt' | 'endAt' | 'note'>>) => {
+    setEntries(prev => prev.map(e =>
+      e.id === id ? { ...e, ...updates } : e
+    ));
+  }, []);
+
+  const updateActiveProject = useCallback((projectId?: string) => {
+    if (!activeEntry) return;
+    setEntries(prev => prev.map(e =>
+      e.id === activeEntry.id ? { ...e, projectId } : e
+    ));
+  }, [activeEntry]);
+
   const addProject = useCallback((name: string, color: string, rate?: number) => {
     const project: Project = {
       id: crypto.randomUUID(),
@@ -241,7 +276,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       projects, addProject, deleteProject, getProject,
       entries, timerState, activeEntry, elapsedSeconds,
       startTimer, stopTimer, pauseTimer, resumeTimer,
-      addQuickTime, addRetroEntry, fixForgotPause,
+      addQuickTime, addRetroEntry, fixForgotPause, fixForgotStop,
+      updateEntry, updateActiveProject,
       todayTotalMinutes, deleteEntry,
     }}>
       {children}

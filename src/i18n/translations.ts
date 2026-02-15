@@ -41,6 +41,11 @@ const translations = {
     note: 'ملاحظة',
     today: 'اليوم',
     noProject: 'بدون مشروع',
+    forgotStop: 'نسيت أوقف؟',
+    whenDidYouFinish: 'متى خلصت شغل؟',
+    editEntry: 'تعديل السجل',
+    editProject: 'تغيير المشروع',
+    edit: 'تعديل',
   },
   en: {
     appName: "Sa3aty",
@@ -84,6 +89,11 @@ const translations = {
     note: 'Note',
     today: 'Today',
     noProject: 'No project',
+    forgotStop: 'Forgot to stop?',
+    whenDidYouFinish: 'When did you finish?',
+    editEntry: 'Edit Entry',
+    editProject: 'Change Project',
+    edit: 'Edit',
   },
 } as const;
 

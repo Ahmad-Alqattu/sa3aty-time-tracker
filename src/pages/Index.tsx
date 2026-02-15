@@ -3,26 +3,52 @@ import TimerButton from '@/components/TimerButton';
 import TodaySummary from '@/components/TodaySummary';
 import ForgotStartSheet from '@/components/ForgotStartSheet';
 import ForgotPauseSheet from '@/components/ForgotPauseSheet';
+import ForgotStopSheet from '@/components/ForgotStopSheet';
 import { Plus } from 'lucide-react';
 
 export default function Index() {
-  const { t, addQuickTime, timerState } = useApp();
+  const { t, addQuickTime, timerState, projects, activeEntry, updateActiveProject } = useApp();
 
   return (
     <div className="min-h-screen pb-24 pt-safe">
-      {/* Header */}
       <header className="px-6 pt-8 pb-4">
         <h1 className="text-2xl font-bold text-foreground">{t('appName')}</h1>
       </header>
 
-      {/* Timer section */}
       <section className="flex flex-col items-center justify-center py-8 px-6">
         <TimerButton />
       </section>
 
-      {/* Quick actions */}
+      {/* Active project selector when timer running */}
+      {timerState !== 'idle' && projects.length > 0 && (
+        <section className="px-6 mb-3">
+          <label className="text-sm text-muted-foreground mb-2 block">{t('selectProject')}</label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => updateActiveProject(undefined)}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                !activeEntry?.projectId ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {t('noProject')}
+            </button>
+            {projects.filter(p => !p.archived).map(p => (
+              <button
+                key={p.id}
+                onClick={() => updateActiveProject(p.id)}
+                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  activeEntry?.projectId === p.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                <span className="inline-block w-2 h-2 rounded-full me-1.5" style={{ backgroundColor: p.color }} />
+                {p.name}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="px-6 space-y-3">
-        {/* Quick add */}
         {timerState === 'idle' && (
           <div className="flex gap-2">
             <button
@@ -42,14 +68,13 @@ export default function Index() {
           </div>
         )}
 
-        {/* Forgot buttons */}
         <div className="flex gap-2">
           {timerState === 'idle' && <ForgotStartSheet />}
           {timerState === 'running' && <ForgotPauseSheet />}
+          {(timerState === 'running' || timerState === 'paused') && <ForgotStopSheet />}
         </div>
       </section>
 
-      {/* Today summary */}
       <section className="px-6 mt-6">
         <TodaySummary />
       </section>
