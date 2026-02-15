@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Pencil } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import EditEntrySheet from '@/components/EditEntrySheet';
+import { TimeEntry } from '@/types';
 
 function formatDuration(ms: number): string {
   const totalMin = Math.round(ms / 60000);
@@ -17,6 +19,8 @@ function formatTimeOfDay(iso: string): string {
 
 export default function Timeline() {
   const { t, entries, deleteEntry, getProject } = useApp();
+  const [editEntry, setEditEntry] = useState<TimeEntry | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const grouped = useMemo(() => {
     const sorted = [...entries].sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
@@ -28,6 +32,11 @@ export default function Timeline() {
     });
     return Object.entries(groups);
   }, [entries]);
+
+  const handleEdit = (entry: TimeEntry) => {
+    setEditEntry(entry);
+    setEditOpen(true);
+  };
 
   return (
     <div className="min-h-screen pb-24 pt-safe">
@@ -93,6 +102,12 @@ export default function Timeline() {
                           {formatDuration(duration)}
                         </span>
                         <button
+                          onClick={() => handleEdit(entry)}
+                          className="p-2 text-muted-foreground hover:text-primary transition-colors rounded-lg"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => deleteEntry(entry.id)}
                           className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-lg"
                         >
@@ -107,6 +122,8 @@ export default function Timeline() {
           </AnimatePresence>
         </div>
       )}
+
+      <EditEntrySheet entry={editEntry} open={editOpen} onOpenChange={setEditOpen} />
     </div>
   );
 }
