@@ -46,6 +46,8 @@ const translations = {
     editEntry: 'تعديل السجل',
     editProject: 'تغيير المشروع',
     edit: 'تعديل',
+    minutesAgo: 'كم دقيقة قبل؟',
+    next: 'التالي',
   },
   en: {
     appName: "Sa3aty",
@@ -94,6 +96,8 @@ const translations = {
     editEntry: 'Edit Entry',
     editProject: 'Change Project',
     edit: 'Edit',
+    minutesAgo: 'How many minutes ago?',
+    next: 'Next',
   },
 } as const;
 
