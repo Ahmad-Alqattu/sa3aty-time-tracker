@@ -76,35 +76,23 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     // Use local audio file only
     const audioSource = `${basePath}${currentSound.localPath}`;
     
-    let errorHandler: (() => void) | null = null;
-    let loadedHandler: (() => void) | null = null;
+    // Clean up previous audio element
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
     
-    const cleanupCurrentAudio = () => {
-      if (audioRef.current) {
-        if (errorHandler) {
-          audioRef.current.removeEventListener('error', errorHandler);
-        }
-        if (loadedHandler) {
-          audioRef.current.removeEventListener('canplaythrough', loadedHandler);
-        }
-        audioRef.current.pause();
-      }
-    };
-    
-    // Clean up previous audio element and listeners
-    cleanupCurrentAudio();
-    
+    // Create new audio element
     audioRef.current = new Audio(audioSource);
     audioRef.current.loop = true;
     audioRef.current.volume = volume / 100;
     
-    errorHandler = () => {
+    const errorHandler = () => {
       console.error(`Failed to load audio file: ${audioSource}`);
       setAudioError(true);
       setIsPlaying(false);
     };
     
-    loadedHandler = () => {
+    const loadedHandler = () => {
       console.log('Audio loaded successfully from local file:', selectedSound);
       setAudioError(false);
     };
@@ -113,8 +101,10 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     audioRef.current.addEventListener('canplaythrough', loadedHandler);
 
     return () => {
-      cleanupCurrentAudio();
       if (audioRef.current) {
+        audioRef.current.removeEventListener('error', errorHandler);
+        audioRef.current.removeEventListener('canplaythrough', loadedHandler);
+        audioRef.current.pause();
         audioRef.current = null;
       }
     };
