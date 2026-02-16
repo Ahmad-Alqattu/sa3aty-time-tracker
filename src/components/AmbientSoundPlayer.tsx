@@ -31,16 +31,49 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
 
   // Initialize audio element
   useEffect(() => {
-    // Try external CDN first, with error handling
-    audioRef.current = new Audio('https://cdn.pixabay.com/download/audio/2022/05/13/audio_257112e488.mp3');
-    audioRef.current.loop = true;
-    audioRef.current.volume = volume / 100;
+    // Determine the base path based on environment
+    const basePath = import.meta.env.PROD ? '/sa3aty-time-tracker' : '';
     
-    audioRef.current.addEventListener('error', () => {
-      console.warn('Failed to load audio from CDN');
-      setAudioError(true);
-      setIsPlaying(false);
-    });
+    // Try local audio file first, then fallback to CDN
+    const audioSources = [
+      `${basePath}/rain-ambient.mp3`,
+      'https://cdn.pixabay.com/download/audio/2022/05/13/audio_257112e488.mp3'
+    ];
+    
+    let currentSourceIndex = 0;
+    
+    const tryNextSource = () => {
+      if (currentSourceIndex >= audioSources.length) {
+        console.warn('All audio sources failed to load');
+        setAudioError(true);
+        setIsPlaying(false);
+        return;
+      }
+      
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      
+      audioRef.current = new Audio(audioSources[currentSourceIndex]);
+      audioRef.current.loop = true;
+      audioRef.current.volume = volume / 100;
+      
+      const errorHandler = () => {
+        console.warn(`Failed to load audio from source ${currentSourceIndex + 1}/${audioSources.length}`);
+        currentSourceIndex++;
+        tryNextSource();
+      };
+      
+      const loadedHandler = () => {
+        console.log('Audio loaded successfully');
+        setAudioError(false);
+      };
+      
+      audioRef.current.addEventListener('error', errorHandler);
+      audioRef.current.addEventListener('canplaythrough', loadedHandler);
+    };
+    
+    tryNextSource();
 
     return () => {
       if (audioRef.current) {
@@ -48,6 +81,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
         audioRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle play/pause

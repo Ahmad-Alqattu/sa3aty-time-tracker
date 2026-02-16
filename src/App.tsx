@@ -12,25 +12,30 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AppProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <ResponsiveLayout>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/timeline" element={<Timeline />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </ResponsiveLayout>
-        </BrowserRouter>
-      </AppProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  // Get base path from environment for GitHub Pages deployment
+  const basename = import.meta.env.PROD ? '/sa3aty-time-tracker' : '/';
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AppProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter basename={basename}>
+            <ResponsiveLayout>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/timeline" element={<Timeline />} />
+                <Route path="/projects" element={<Projects />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </ResponsiveLayout>
+          </BrowserRouter>
+        </AppProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
