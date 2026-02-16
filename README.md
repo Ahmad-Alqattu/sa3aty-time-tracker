@@ -1,5 +1,9 @@
 # Welcome to your Lovable project
 
+> **🇸🇦 للحصول على التعليمات باللغة العربية، انظر [README.ar.md](./README.ar.md)**
+> 
+> **For Arabic instructions, see [README.ar.md](./README.ar.md)**
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
