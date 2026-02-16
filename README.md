@@ -60,9 +60,30 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Features
+
+- ✅ **Responsive Design**: Desktop sidebar layout and mobile-friendly bottom navigation
+- ✅ **Progressive Web App (PWA)**: Works offline with service worker support
+- ✅ **Ambient Sounds**: Built-in rain sound player with volume control for focus and relaxation
+- ✅ **Time Tracking**: Easy-to-use timer with project management
+- ✅ **RTL Support**: Full Arabic language support with right-to-left layout
+- ✅ **Auto-Deployment**: Automatic deployment to GitHub Pages on every push
+
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+### GitHub Pages (Recommended)
+
+This project is configured for automatic deployment to GitHub Pages. Every push to the `main` branch will trigger a deployment.
+
+1. Go to your repository settings
+2. Navigate to Pages section
+3. Under "Build and deployment", select "GitHub Actions" as the source
+4. Push changes to the `main` branch
+5. Your site will be available at: `https://ahmad-alqattu.github.io/sa3aty-time-tracker/`
+
+### Lovable
+
+Alternatively, you can open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
 
 ## Can I connect a custom domain to my Lovable project?
 

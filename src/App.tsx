@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppProvider } from "@/contexts/AppContext";
-import Navigation from "@/components/Navigation";
+import ResponsiveLayout from "@/components/ResponsiveLayout";
 import Index from "./pages/Index";
 import Timeline from "./pages/Timeline";
 import Projects from "./pages/Projects";
@@ -19,15 +19,14 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <div className="max-w-lg mx-auto">
+          <ResponsiveLayout>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/timeline" element={<Timeline />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
-            <Navigation />
-          </div>
+          </ResponsiveLayout>
         </BrowserRouter>
       </AppProvider>
     </TooltipProvider>
