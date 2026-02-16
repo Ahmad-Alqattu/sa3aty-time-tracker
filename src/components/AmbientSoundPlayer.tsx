@@ -41,6 +41,8 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     ];
     
     let currentSourceIndex = 0;
+    let errorHandler: (() => void) | null = null;
+    let loadedHandler: (() => void) | null = null;
     
     const tryNextSource = () => {
       if (currentSourceIndex >= audioSources.length) {
@@ -50,7 +52,10 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
         return;
       }
       
+      // Clean up previous audio element and listeners
       if (audioRef.current) {
+        if (errorHandler) audioRef.current.removeEventListener('error', errorHandler);
+        if (loadedHandler) audioRef.current.removeEventListener('canplaythrough', loadedHandler);
         audioRef.current.pause();
       }
       
@@ -58,13 +63,13 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
       audioRef.current.loop = true;
       audioRef.current.volume = volume / 100;
       
-      const errorHandler = () => {
+      errorHandler = () => {
         console.warn(`Failed to load audio from source ${currentSourceIndex + 1}/${audioSources.length}`);
         currentSourceIndex++;
         tryNextSource();
       };
       
-      const loadedHandler = () => {
+      loadedHandler = () => {
         console.log('Audio loaded successfully');
         setAudioError(false);
       };
@@ -77,10 +82,13 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
 
     return () => {
       if (audioRef.current) {
+        if (errorHandler) audioRef.current.removeEventListener('error', errorHandler);
+        if (loadedHandler) audioRef.current.removeEventListener('canplaythrough', loadedHandler);
         audioRef.current.pause();
         audioRef.current = null;
       }
     };
+    // Volume is intentionally excluded - it's handled by a separate effect below
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
