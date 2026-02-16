@@ -28,12 +28,28 @@
     // Handle redirects from 404.html for GitHub Pages SPA routing
     (function() {
       var redirect = sessionStorage.getItem('redirect');
-      if (redirect && redirect !== '/sa3aty-time-tracker/' && redirect !== '/sa3aty-time-tracker') {
+      if (redirect) {
         sessionStorage.removeItem('redirect');
-        // Remove the base path if present to get the app route
-        var route = redirect.replace('/sa3aty-time-tracker', '');
-        if (route && route !== '/') {
-          history.replaceState(null, null, route);
+        
+        // Determine base path dynamically
+        var basePath = (function() {
+          var scripts = document.getElementsByTagName('script');
+          for (var i = 0; i < scripts.length; i++) {
+            var src = scripts[i].src;
+            if (src && src.indexOf('/assets/') !== -1) {
+              var match = src.match(/^(.*?)\/assets\//);
+              if (match) return match[1];
+            }
+          }
+          return '';
+        })();
+        
+        // Extract route by removing base path from redirect
+        if (basePath && redirect.indexOf(basePath) === 0) {
+          var route = redirect.substring(basePath.length);
+          if (route && route !== '/' && route !== '') {
+            history.replaceState(null, null, route);
+          }
         }
       }
     })();

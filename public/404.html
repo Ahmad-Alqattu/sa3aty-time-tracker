@@ -6,8 +6,10 @@
     <script>
       // Single Page Application redirect for GitHub Pages
       // Store the current path and redirect to index.html
+      // Dynamically determine the base path from the current location
+      var basePath = location.pathname.split('/').slice(0, 2).join('/') + '/';
       sessionStorage.setItem('redirect', location.pathname);
-      location.replace('/sa3aty-time-tracker/');
+      location.replace(basePath);
     </script>
   </head>
   <body>
