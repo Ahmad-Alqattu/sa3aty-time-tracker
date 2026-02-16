@@ -2,7 +2,7 @@
   "name": "ساعتي - Sa3aty Time Tracker",
   "short_name": "ساعتي",
   "description": "تتبع ساعات العمل بسهولة وبساطة",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0D9488",
@@ -35,7 +35,7 @@
       "name": "بدء العمل",
       "short_name": "بدء",
       "description": "بدء تتبع الوقت",
-      "url": "/",
+      "url": "./",
       "icons": []
     }
   ]

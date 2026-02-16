@@ -3,14 +3,17 @@ import { Volume2, VolumeX, Play, Pause } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useApp } from '@/contexts/AppContext';
 
 interface AmbientSoundPlayerProps {
   compact?: boolean;
 }
 
 export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlayerProps) {
+  const { t } = useApp();
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(50);
+  const [audioError, setAudioError] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Load saved preferences
@@ -28,10 +31,16 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
 
   // Initialize audio element
   useEffect(() => {
-    // Using a rain sound URL from a free source
+    // Try external CDN first, with error handling
     audioRef.current = new Audio('https://cdn.pixabay.com/download/audio/2022/05/13/audio_257112e488.mp3');
     audioRef.current.loop = true;
     audioRef.current.volume = volume / 100;
+    
+    audioRef.current.addEventListener('error', () => {
+      console.warn('Failed to load audio from CDN');
+      setAudioError(true);
+      setIsPlaying(false);
+    });
 
     return () => {
       if (audioRef.current) {
@@ -43,7 +52,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
 
   // Handle play/pause
   useEffect(() => {
-    if (!audioRef.current) return;
+    if (!audioRef.current || audioError) return;
 
     if (isPlaying) {
       const playPromise = audioRef.current.play();
@@ -58,7 +67,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     }
 
     localStorage.setItem('ambientIsPlaying', isPlaying.toString());
-  }, [isPlaying]);
+  }, [isPlaying, audioError]);
 
   // Handle volume changes
   useEffect(() => {
@@ -69,6 +78,10 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
   }, [volume]);
 
   const togglePlay = () => {
+    if (audioError) {
+      console.warn('Audio not available');
+      return;
+    }
     setIsPlaying(!isPlaying);
   };
 
@@ -81,6 +94,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
             size="icon"
             variant="secondary"
             className="h-12 w-12 rounded-full shadow-lg"
+            disabled={audioError}
           >
             {isPlaying ? (
               <Volume2 className="h-5 w-5" />
@@ -92,11 +106,12 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
         <PopoverContent className="w-64" side="top" align="end">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">أصوات محيطة</span>
+              <span className="text-sm font-medium">{t('ambientSounds')}</span>
               <Button
                 size="sm"
                 variant={isPlaying ? "default" : "outline"}
                 onClick={togglePlay}
+                disabled={audioError}
               >
                 {isPlaying ? (
                   <Pause className="h-4 w-4" />
@@ -107,7 +122,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>صوت المطر</span>
+                <span>{t('rainSound')}</span>
                 <span>{volume}%</span>
               </div>
               <Slider
@@ -116,6 +131,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
                 max={100}
                 step={1}
                 className="w-full"
+                disabled={audioError}
               />
             </div>
           </div>
@@ -128,11 +144,12 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
   return (
     <div className="p-3 bg-muted/50 rounded-lg space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">أصوات محيطة</span>
+        <span className="text-sm font-medium">{t('ambientSounds')}</span>
         <Button
           size="sm"
           variant={isPlaying ? "default" : "outline"}
           onClick={togglePlay}
+          disabled={audioError}
         >
           {isPlaying ? (
             <Pause className="h-4 w-4" />
@@ -143,7 +160,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>صوت المطر</span>
+          <span>{t('rainSound')}</span>
           <span>{volume}%</span>
         </div>
         <Slider
@@ -152,6 +169,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
           max={100}
           step={1}
           className="w-full"
+          disabled={audioError}
         />
       </div>
     </div>

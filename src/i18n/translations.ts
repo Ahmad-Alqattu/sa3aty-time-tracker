@@ -52,6 +52,8 @@ const translations = {
     from: 'من',
     to: 'إلى',
     export: 'تصدير',
+    ambientSounds: 'أصوات محيطة',
+    rainSound: 'صوت المطر',
   },
   en: {
     appName: "Sa3aty",
@@ -106,6 +108,8 @@ const translations = {
     from: 'From',
     to: 'To',
     export: 'Export',
+    ambientSounds: 'Ambient Sounds',
+    rainSound: 'Rain Sound',
   },
 } as const;
 
