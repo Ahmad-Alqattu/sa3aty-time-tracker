@@ -34,8 +34,22 @@ function loadJson<T>(key: string, fallback: T): T {
   try {
     const saved = localStorage.getItem(key);
     return saved ? JSON.parse(saved) : fallback;
-  } catch {
+  } catch (error) {
+    console.error(`Failed to load ${key} from localStorage:`, error);
     return fallback;
+  }
+}
+
+function saveJson(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error(`Failed to save ${key} to localStorage:`, error);
+    // Check if quota exceeded
+    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+      // Show user-friendly error - could be expanded with toast notification
+      alert('Storage quota exceeded. Please export and clear old data.');
+    }
   }
 }
 
@@ -62,9 +76,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [timerState]);
 
-  // Persist
-  useEffect(() => { localStorage.setItem('sa3aty-projects', JSON.stringify(projects)); }, [projects]);
-  useEffect(() => { localStorage.setItem('sa3aty-entries', JSON.stringify(entries)); }, [entries]);
+  // Persist with error handling
+  useEffect(() => { saveJson('sa3aty-projects', projects); }, [projects]);
+  useEffect(() => { saveJson('sa3aty-entries', entries); }, [entries]);
 
   // Language
   const setLanguage = useCallback((lang: Language) => {
@@ -77,7 +91,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
-  }, []);
+  }, [language]);
 
   const t = useCallback((key: TranslationKey) => {
     return translations[language][key] || key;
@@ -100,6 +114,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return sum + (pe - ps);
     }, 0);
     return Math.max(0, Math.floor((end - start - totalPausedMs) / 1000));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEntry, timerState, tick]);
 
   // Today total
@@ -117,6 +132,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }, 0);
         return sum + (end - start - pausedMs);
       }, 0) / 60000;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, tick]);
 
   // Actions
@@ -187,13 +203,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [entries]);
 
   const addRetroEntry = useCallback((projectId: string | undefined, startAt: Date, endAt: Date | null, note?: string) => {
+    // Validate dates
+    if (!(startAt instanceof Date) || isNaN(startAt.getTime())) {
+      console.error('Invalid start date');
+      return;
+    }
+    if (endAt && (!(endAt instanceof Date) || isNaN(endAt.getTime()))) {
+      console.error('Invalid end date');
+      return;
+    }
+    if (endAt && endAt < startAt) {
+      console.error('End date cannot be before start date');
+      return;
+    }
+    
     const entry: TimeEntry = {
       id: crypto.randomUUID(),
       projectId,
       startAt: startAt.toISOString(),
       endAt: endAt?.toISOString(),
       pauses: [],
-      note,
+      note: note?.trim(),
       source: 'retro',
       createdAt: new Date().toISOString(),
     };
@@ -250,9 +280,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [activeEntry]);
 
   const addProject = useCallback((name: string, color: string, rate?: number) => {
+    // Validate inputs
+    if (!name || name.trim().length === 0) {
+      console.error('Project name cannot be empty');
+      return;
+    }
+    if (!color || !/^#[0-9A-Fa-f]{6}$/.test(color)) {
+      console.error('Invalid color format');
+      return;
+    }
+    if (rate !== undefined && (isNaN(rate) || rate < 0)) {
+      console.error('Invalid rate value');
+      return;
+    }
+    
     const project: Project = {
       id: crypto.randomUUID(),
-      name,
+      name: name.trim(),
       color,
       rate,
       archived: false,
