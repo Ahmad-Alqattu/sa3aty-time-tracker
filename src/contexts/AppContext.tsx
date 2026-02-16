@@ -47,7 +47,8 @@ function saveJson(key: string, value: unknown): void {
     console.error(`Failed to save ${key} to localStorage:`, error);
     // Check if quota exceeded
     if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-      // Show user-friendly error - could be expanded with toast notification
+      // TODO: Replace alert with toast notification system (e.g., sonner is already installed)
+      // Using alert as fallback for now to ensure users are notified of critical storage issues
       alert('Storage quota exceeded. Please export and clear old data.');
     }
   }
@@ -114,6 +115,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return sum + (pe - ps);
     }, 0);
     return Math.max(0, Math.floor((end - start - totalPausedMs) / 1000));
+    // Note: `tick` is intentionally included to force re-calculation every second
+    // when timer is running, despite not being directly used in the calculation
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEntry, timerState, tick]);
 
@@ -132,6 +135,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }, 0);
         return sum + (end - start - pausedMs);
       }, 0) / 60000;
+    // Note: `tick` is intentionally included to update the total in real-time
+    // for running timers, despite not being directly used in the calculation
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, tick]);
 
