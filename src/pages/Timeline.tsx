@@ -1,12 +1,13 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { Trash2, Pencil, Download } from 'lucide-react';
+import { Trash2, Pencil, Download, FileSpreadsheet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import EditEntrySheet from '@/components/EditEntrySheet';
 import { TimeEntry } from '@/types';
+import * as XLSX from 'xlsx';
 
 function formatDuration(ms: number): string {
   const totalMin = Math.round(ms / 60000);
@@ -54,7 +55,7 @@ export default function Timeline() {
     setExportOpen(true);
   };
 
-  const exportCsv = useCallback(() => {
+  const exportExcel = useCallback(() => {
     const fromTs = new Date(fromDate).getTime();
     const toTs = new Date(toDate + 'T23:59:59').getTime();
     const filtered = entries.filter(e => {
@@ -63,8 +64,8 @@ export default function Timeline() {
     });
     const sorted = [...filtered].sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
 
-    const header = 'Project,Start,End,Duration (min),Pauses,Note\n';
-    const rows = sorted.map(e => {
+    // Prepare data
+    const data = sorted.map(e => {
       const project = getProject(e.projectId);
       const start = new Date(e.startAt);
       const end = e.endAt ? new Date(e.endAt) : null;
@@ -75,24 +76,83 @@ export default function Timeline() {
       }, 0);
       const durationMs = (end ? end.getTime() : Date.now()) - start.getTime() - pausedMs;
       const durationMin = Math.round(durationMs / 60000);
-      const escapeCsv = (s: string) => `"${s.replace(/"/g, '""')}"`;
-      return [
-        escapeCsv(project?.name || ''),
-        start.toISOString(),
-        end ? end.toISOString() : '',
-        durationMin,
-        e.pauses.length,
-        escapeCsv(e.note || ''),
-      ].join(',');
-    }).join('\n');
+      const hours = Math.floor(durationMin / 60);
+      const mins = durationMin % 60;
+      
+      return {
+        'المشروع': project?.name || 'بدون مشروع',
+        'التاريخ': start.toLocaleDateString('ar-SA'),
+        'البداية': start.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+        'النهاية': end ? end.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : 'جاري',
+        'المدة (دقائق)': durationMin,
+        'المدة': `${hours}:${mins.toString().padStart(2, '0')}`,
+        'فترات التوقف': e.pauses.length,
+        'ملاحظات': e.note || ''
+      };
+    });
 
-    const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sa3aty-${fromDate}_${toDate}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    // Calculate totals by project
+    const projectTotals: Record<string, number> = {};
+    data.forEach(row => {
+      const project = row['المشروع'];
+      projectTotals[project] = (projectTotals[project] || 0) + row['المدة (دقائق)'];
+    });
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    
+    // Main data sheet
+    const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 20 },  // المشروع
+      { wch: 12 },  // التاريخ
+      { wch: 10 },  // البداية
+      { wch: 10 },  // النهاية
+      { wch: 12 },  // المدة (دقائق)
+      { wch: 10 },  // المدة
+      { wch: 12 },  // فترات التوقف
+      { wch: 30 },  // ملاحظات
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, 'السجلات');
+
+    // Summary sheet
+    const summaryData = Object.entries(projectTotals).map(([project, minutes]) => {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return {
+        'المشروع': project,
+        'إجمالي الدقائق': minutes,
+        'إجمالي الوقت': `${hours}:${mins.toString().padStart(2, '0')}`,
+        'إجمالي الساعات': (minutes / 60).toFixed(2)
+      };
+    });
+    
+    // Add grand total
+    const grandTotal = Object.values(projectTotals).reduce((a, b) => a + b, 0);
+    const grandHours = Math.floor(grandTotal / 60);
+    const grandMins = grandTotal % 60;
+    summaryData.push({
+      'المشروع': '📊 الإجمالي الكلي',
+      'إجمالي الدقائق': grandTotal,
+      'إجمالي الوقت': `${grandHours}:${grandMins.toString().padStart(2, '0')}`,
+      'إجمالي الساعات': (grandTotal / 60).toFixed(2)
+    });
+
+    const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+    summaryWs['!cols'] = [
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+    ];
+    
+    XLSX.utils.book_append_sheet(wb, summaryWs, 'ملخص');
+
+    // Export file
+    XLSX.writeFile(wb, `sa3aty-${fromDate}_${toDate}.xlsx`);
     setExportOpen(false);
   }, [entries, getProject, fromDate, toDate]);
 
@@ -105,8 +165,8 @@ export default function Timeline() {
             onClick={handleExportClick}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
-            <Download className="w-4 h-4" />
-            {t('exportCsv')}
+            <FileSpreadsheet className="w-4 h-4" />
+            {t('export')}
           </button>
         )}
       </header>
@@ -196,7 +256,7 @@ export default function Timeline() {
       <Sheet open={exportOpen} onOpenChange={setExportOpen}>
         <SheetContent side="bottom" className="rounded-t-3xl pb-safe">
           <SheetHeader>
-            <SheetTitle>{t('exportCsv')}</SheetTitle>
+            <SheetTitle>تصدير Excel</SheetTitle>
           </SheetHeader>
           <div className="mt-4 space-y-4">
             <div className="space-y-2">
@@ -208,9 +268,9 @@ export default function Timeline() {
               <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="rounded-xl h-12" />
             </div>
             <div className="flex gap-3">
-              <Button onClick={exportCsv} className="flex-1 rounded-xl h-12">
-                <Download className="w-4 h-4 me-2" />
-                {t('export')}
+              <Button onClick={exportExcel} className="flex-1 rounded-xl h-12 bg-green-600 hover:bg-green-700">
+                <FileSpreadsheet className="w-4 h-4 me-2" />
+                تصدير Excel
               </Button>
               <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-xl h-12">
                 {t('cancel')}

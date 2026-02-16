@@ -59,13 +59,11 @@ const SOUND_OPTIONS: SoundOption[] = [
 
 // Audio Visualizer Component
 function AudioVisualizer({ isActive }: { isActive: boolean }) {
-  const bars = 4;
-  
   if (!isActive) return null;
   
   return (
     <div className="flex items-end justify-center gap-0.5 h-3 absolute -top-2 left-1/2 -translate-x-1/2">
-      {Array.from({ length: bars }).map((_, i) => (
+      {[0, 1, 2, 3].map((i) => (
         <div
           key={i}
           className="w-0.5 rounded-full bg-white"
@@ -86,7 +84,7 @@ function AudioVisualizer({ isActive }: { isActive: boolean }) {
   );
 }
 
-// Sound Button Component (icon only with tooltip)
+// Sound Button Component
 function SoundButton({ 
   sound, 
   isEnabled, 
@@ -177,6 +175,68 @@ function MixerSlider({
   );
 }
 
+// Audio Manager - handles all audio operations
+class AudioManager {
+  private audioElements: Map<SoundType, HTMLAudioElement> = new Map();
+  private initialized = false;
+  
+  init(basePath: string) {
+    if (this.initialized) return;
+    
+    SOUND_OPTIONS.forEach(sound => {
+      const audio = new Audio(`${basePath}${sound.localPath}`);
+      audio.loop = true;
+      audio.preload = 'auto';
+      audio.volume = 0.5;
+      this.audioElements.set(sound.id, audio);
+    });
+    
+    this.initialized = true;
+  }
+  
+  play(soundId: SoundType) {
+    const audio = this.audioElements.get(soundId);
+    if (audio) {
+      audio.currentTime = audio.currentTime || 0;
+      const playPromise = audio.play();
+      if (playPromise) {
+        playPromise.catch(err => console.error(`Failed to play ${soundId}:`, err));
+      }
+    }
+  }
+  
+  pause(soundId: SoundType) {
+    const audio = this.audioElements.get(soundId);
+    if (audio) {
+      audio.pause();
+    }
+  }
+  
+  setVolume(soundId: SoundType, volume: number) {
+    const audio = this.audioElements.get(soundId);
+    if (audio) {
+      audio.volume = Math.max(0, Math.min(1, volume));
+    }
+  }
+  
+  isPlaying(soundId: SoundType): boolean {
+    const audio = this.audioElements.get(soundId);
+    return audio ? !audio.paused : false;
+  }
+  
+  cleanup() {
+    this.audioElements.forEach(audio => {
+      audio.pause();
+      audio.src = '';
+    });
+    this.audioElements.clear();
+    this.initialized = false;
+  }
+}
+
+// Singleton audio manager
+const audioManager = new AudioManager();
+
 export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlayerProps) {
   const [masterVolume, setMasterVolume] = useState(50);
   const [individualVolumes, setIndividualVolumes] = useState<Record<SoundType, number>>({
@@ -187,7 +247,20 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
   });
   const [enabledSounds, setEnabledSounds] = useState<Set<SoundType>>(new Set());
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const audioRefsMap = useRef<Map<SoundType, HTMLAudioElement>>(new Map());
+  const isInitialized = useRef(false);
+
+  // Initialize audio manager
+  useEffect(() => {
+    if (!isInitialized.current) {
+      const basePath = import.meta.env.PROD ? '/sa3aty-time-tracker' : '';
+      audioManager.init(basePath);
+      isInitialized.current = true;
+    }
+    
+    return () => {
+      // Don't cleanup on unmount to keep audio playing during navigation
+    };
+  }, []);
 
   // Load saved preferences
   useEffect(() => {
@@ -215,68 +288,42 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     }
   }, []);
 
-  // Initialize audio elements
+  // Sync audio state with enabledSounds
   useEffect(() => {
-    const basePath = import.meta.env.PROD ? '/sa3aty-time-tracker' : '';
-    const audioRefs = audioRefsMap.current;
-    
     SOUND_OPTIONS.forEach(sound => {
-      if (!audioRefs.has(sound.id)) {
-        const audio = new Audio(`${basePath}${sound.localPath}`);
-        audio.loop = true;
-        audio.volume = (masterVolume / 100) * (individualVolumes[sound.id] / 100);
-        
-        audio.addEventListener('error', () => {
-          console.error(`Failed to load audio: ${sound.id}`);
-        });
-        
-        audioRefs.set(sound.id, audio);
+      const isEnabled = enabledSounds.has(sound.id);
+      const isPlaying = audioManager.isPlaying(sound.id);
+      
+      if (isEnabled && !isPlaying) {
+        audioManager.play(sound.id);
+      } else if (!isEnabled && isPlaying) {
+        audioManager.pause(sound.id);
       }
     });
+    
+    localStorage.setItem('ambientEnabledSounds', JSON.stringify(Array.from(enabledSounds)));
+  }, [enabledSounds]);
 
-    return () => {
-      audioRefs.forEach(audio => {
-        audio.pause();
-      });
-      audioRefs.clear();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Handle volume changes
+  // Update volumes
   useEffect(() => {
-    audioRefsMap.current.forEach((audio, soundId) => {
-      audio.volume = (masterVolume / 100) * (individualVolumes[soundId] / 100);
+    SOUND_OPTIONS.forEach(sound => {
+      const finalVolume = (masterVolume / 100) * (individualVolumes[sound.id] / 100);
+      audioManager.setVolume(sound.id, finalVolume);
     });
+    
     localStorage.setItem('ambientMasterVolume', masterVolume.toString());
     localStorage.setItem('ambientIndividualVolumes', JSON.stringify(individualVolumes));
   }, [masterVolume, individualVolumes]);
-
-  // Play/pause sounds
-  useEffect(() => {
-    audioRefsMap.current.forEach((audio, soundId) => {
-      if (enabledSounds.has(soundId)) {
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.error(`Error playing ${soundId}:`, error);
-          });
-        }
-      } else {
-        audio.pause();
-      }
-    });
-
-    localStorage.setItem('ambientEnabledSounds', JSON.stringify(Array.from(enabledSounds)));
-  }, [enabledSounds]);
 
   const toggleSound = useCallback((soundId: SoundType) => {
     setEnabledSounds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(soundId)) {
         newSet.delete(soundId);
+        audioManager.pause(soundId); // Immediately pause
       } else {
         newSet.add(soundId);
+        audioManager.play(soundId); // Immediately play
       }
       return newSet;
     });
@@ -298,10 +345,9 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     });
   }, [masterVolume]);
 
-  // Settings content (shared between mobile Sheet and desktop Dialog)
+  // Settings content
   const SettingsContent = () => (
     <div className="space-y-4">
-      {/* Reset button */}
       <div className="flex justify-end">
         <Button
           variant="ghost"
@@ -313,8 +359,6 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
           توحيد الصوت
         </Button>
       </div>
-
-      {/* Individual sound mixers */}
       <div className="space-y-2">
         {SOUND_OPTIONS.map(sound => (
           <MixerSlider
@@ -335,7 +379,6 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     return (
       <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40">
         <div className="flex flex-col items-center gap-3 bg-black/30 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border border-white/10">
-          {/* Sound buttons row */}
           <div className="flex items-center gap-2">
             {SOUND_OPTIONS.map(sound => (
               <SoundButton
@@ -346,7 +389,6 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
               />
             ))}
             
-            {/* Settings button - opens Sheet from bottom on mobile */}
             <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
               <SheetTrigger asChild>
                 <Button
@@ -366,7 +408,6 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
             </Sheet>
           </div>
 
-          {/* Master volume slider */}
           <div className="flex items-center gap-2 w-full px-1">
             <VolumeX className="h-4 w-4 text-white/60 shrink-0" />
             <Slider
@@ -383,13 +424,12 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     );
   }
 
-  // Full version for desktop sidebar
+  // Desktop version
   return (
     <div className="p-4 bg-muted/50 rounded-xl space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">أصوات محيطة</span>
         
-        {/* Settings button - opens Dialog centered on desktop */}
         <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
           <DialogTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -405,7 +445,6 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
         </Dialog>
       </div>
       
-      {/* Sound toggle buttons */}
       <div className="flex justify-center gap-2">
         {SOUND_OPTIONS.map(sound => (
           <SoundButton
@@ -417,7 +456,6 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
         ))}
       </div>
 
-      {/* Master volume control */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>مستوى الصوت</span>
@@ -436,7 +474,6 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
         </div>
       </div>
 
-      {/* Active sounds indicator */}
       {enabledSounds.size > 0 && (
         <div className="text-center text-xs text-muted-foreground">
           {enabledSounds.size} صوت مفعّل
