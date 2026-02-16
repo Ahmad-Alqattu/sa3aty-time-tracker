@@ -24,6 +24,20 @@
   <meta property="og:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/720e80cb-e6fb-46a0-8ad2-df867da115d1/id-preview-12516f90--0777dd84-3e93-4ace-bf87-5ca0d980bc18.lovable.app-1771261378076.png">
   <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/720e80cb-e6fb-46a0-8ad2-df867da115d1/id-preview-12516f90--0777dd84-3e93-4ace-bf87-5ca0d980bc18.lovable.app-1771261378076.png">
   <meta name="twitter:card" content="summary_large_image">
+  <script>
+    // Handle redirects from 404.html for GitHub Pages SPA routing
+    (function() {
+      var redirect = sessionStorage.getItem('redirect');
+      if (redirect && redirect !== '/sa3aty-time-tracker/' && redirect !== '/sa3aty-time-tracker') {
+        sessionStorage.removeItem('redirect');
+        // Remove the base path if present to get the app route
+        var route = redirect.replace('/sa3aty-time-tracker', '');
+        if (route && route !== '/') {
+          history.replaceState(null, null, route);
+        }
+      }
+    })();
+  </script>
 </head>
   <body>
     <div id="root"></div>
