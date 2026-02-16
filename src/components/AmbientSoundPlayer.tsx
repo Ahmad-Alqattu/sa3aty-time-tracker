@@ -41,8 +41,20 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     ];
     
     let currentSourceIndex = 0;
-    let errorHandler: (() => void) | null = null;
-    let loadedHandler: (() => void) | null = null;
+    let currentErrorHandler: (() => void) | null = null;
+    let currentLoadedHandler: (() => void) | null = null;
+    
+    const cleanupCurrentAudio = () => {
+      if (audioRef.current) {
+        if (currentErrorHandler) {
+          audioRef.current.removeEventListener('error', currentErrorHandler);
+        }
+        if (currentLoadedHandler) {
+          audioRef.current.removeEventListener('canplaythrough', currentLoadedHandler);
+        }
+        audioRef.current.pause();
+      }
+    };
     
     const tryNextSource = () => {
       if (currentSourceIndex >= audioSources.length) {
@@ -53,42 +65,36 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
       }
       
       // Clean up previous audio element and listeners
-      if (audioRef.current) {
-        if (errorHandler) audioRef.current.removeEventListener('error', errorHandler);
-        if (loadedHandler) audioRef.current.removeEventListener('canplaythrough', loadedHandler);
-        audioRef.current.pause();
-      }
+      cleanupCurrentAudio();
       
       audioRef.current = new Audio(audioSources[currentSourceIndex]);
       audioRef.current.loop = true;
       audioRef.current.volume = volume / 100;
       
-      errorHandler = () => {
+      currentErrorHandler = () => {
         console.warn(`Failed to load audio from source ${currentSourceIndex + 1}/${audioSources.length}`);
         currentSourceIndex++;
         tryNextSource();
       };
       
-      loadedHandler = () => {
+      currentLoadedHandler = () => {
         console.log('Audio loaded successfully');
         setAudioError(false);
       };
       
-      audioRef.current.addEventListener('error', errorHandler);
-      audioRef.current.addEventListener('canplaythrough', loadedHandler);
+      audioRef.current.addEventListener('error', currentErrorHandler);
+      audioRef.current.addEventListener('canplaythrough', currentLoadedHandler);
     };
     
     tryNextSource();
 
     return () => {
+      cleanupCurrentAudio();
       if (audioRef.current) {
-        if (errorHandler) audioRef.current.removeEventListener('error', errorHandler);
-        if (loadedHandler) audioRef.current.removeEventListener('canplaythrough', loadedHandler);
-        audioRef.current.pause();
         audioRef.current = null;
       }
     };
-    // Volume is intentionally excluded - it's handled by a separate effect below
+    // Volume is intentionally excluded - it's handled by the volume effect (lines 102-107)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
