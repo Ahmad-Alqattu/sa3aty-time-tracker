@@ -17,7 +17,6 @@ interface SoundOption {
   name: string;
   nameAr: string;
   localPath: string;
-  cdnFallback: string;
 }
 
 const SOUND_OPTIONS: SoundOption[] = [
@@ -25,22 +24,19 @@ const SOUND_OPTIONS: SoundOption[] = [
     id: 'rain',
     name: 'Rain',
     nameAr: 'مطر',
-    localPath: '/rain-07.mp3',
-    cdnFallback: 'https://www.soundjay.com/nature/rain-07.mp3'
+    localPath: '/rain-07.mp3'
   },
   {
     id: 'cafe',
     name: 'Cafe',
     nameAr: 'مقهى',
-    localPath: '/cafe-ambience.mp3',
-    cdnFallback: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Ambience_of_a_busy_cafe.mp3'
+    localPath: '/cafe-ambience.mp3'
   },
   {
     id: 'brownNoise',
     name: 'Brown Noise',
     nameAr: 'ضجيج بني',
-    localPath: '/brown-noise.mp3',
-    cdnFallback: 'https://cdn.pixabay.com/download/audio/2022/02/03/audio_5131105e4c.mp3'
+    localPath: '/brown-noise.mp3'
   }
 ];
 
@@ -77,63 +73,38 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     // Get the current sound option
     const currentSound = SOUND_OPTIONS.find(s => s.id === selectedSound) || SOUND_OPTIONS[0];
     
-    // Try local audio file first, then fallback to CDN
-    const audioSources = [
-      `${basePath}${currentSound.localPath}`,
-      currentSound.cdnFallback
-    ];
+    // Use local audio file only
+    const audioSource = `${basePath}${currentSound.localPath}`;
     
-    let currentSourceIndex = 0;
-    let currentErrorHandler: (() => void) | null = null;
-    let currentLoadedHandler: (() => void) | null = null;
+    // Clean up previous audio element
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
     
-    const cleanupCurrentAudio = () => {
-      if (audioRef.current) {
-        if (currentErrorHandler) {
-          audioRef.current.removeEventListener('error', currentErrorHandler);
-        }
-        if (currentLoadedHandler) {
-          audioRef.current.removeEventListener('canplaythrough', currentLoadedHandler);
-        }
-        audioRef.current.pause();
-      }
+    // Create new audio element
+    audioRef.current = new Audio(audioSource);
+    audioRef.current.loop = true;
+    audioRef.current.volume = volume / 100;
+    
+    const errorHandler = () => {
+      console.error(`Failed to load audio file: ${audioSource}`);
+      setAudioError(true);
+      setIsPlaying(false);
     };
     
-    const tryNextSource = () => {
-      if (currentSourceIndex >= audioSources.length) {
-        console.warn('All audio sources failed to load for:', selectedSound);
-        setAudioError(true);
-        setIsPlaying(false);
-        return;
-      }
-      
-      // Clean up previous audio element and listeners
-      cleanupCurrentAudio();
-      
-      audioRef.current = new Audio(audioSources[currentSourceIndex]);
-      audioRef.current.loop = true;
-      audioRef.current.volume = volume / 100;
-      
-      currentErrorHandler = () => {
-        console.warn(`Failed to load audio from source ${currentSourceIndex + 1}/${audioSources.length} for ${selectedSound}`);
-        currentSourceIndex++;
-        tryNextSource();
-      };
-      
-      currentLoadedHandler = () => {
-        console.log('Audio loaded successfully:', selectedSound);
-        setAudioError(false);
-      };
-      
-      audioRef.current.addEventListener('error', currentErrorHandler);
-      audioRef.current.addEventListener('canplaythrough', currentLoadedHandler);
+    const loadedHandler = () => {
+      console.log('Audio loaded successfully from local file:', selectedSound);
+      setAudioError(false);
     };
     
-    tryNextSource();
+    audioRef.current.addEventListener('error', errorHandler);
+    audioRef.current.addEventListener('canplaythrough', loadedHandler);
 
     return () => {
-      cleanupCurrentAudio();
       if (audioRef.current) {
+        audioRef.current.removeEventListener('error', errorHandler);
+        audioRef.current.removeEventListener('canplaythrough', loadedHandler);
+        audioRef.current.pause();
         audioRef.current = null;
       }
     };
