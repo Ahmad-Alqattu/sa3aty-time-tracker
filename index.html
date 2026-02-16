@@ -31,24 +31,14 @@
       if (redirect) {
         sessionStorage.removeItem('redirect');
         
-        // Determine base path dynamically
-        var basePath = (function() {
-          var scripts = document.getElementsByTagName('script');
-          for (var i = 0; i < scripts.length; i++) {
-            var src = scripts[i].src;
-            if (src && src.indexOf('/assets/') !== -1) {
-              var match = src.match(/^(.*?)\/assets\//);
-              if (match) return match[1];
-            }
-          }
-          return '';
-        })();
+        // Use the known base path for this project
+        var basePath = '/sa3aty-time-tracker';
         
         // Extract route by removing base path from redirect
-        if (basePath && redirect.indexOf(basePath) === 0) {
-          var route = redirect.substring(basePath.length);
-          if (route && route !== '/' && route !== '') {
-            history.replaceState(null, null, route);
+        if (redirect.indexOf(basePath) === 0) {
+          var route = redirect.substring(basePath.length) || '/';
+          if (route !== '/') {
+            history.replaceState(null, null, basePath + route);
           }
         }
       }
