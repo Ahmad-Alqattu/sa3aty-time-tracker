@@ -2,6 +2,9 @@ import { useMemo, useState, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Trash2, Pencil, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import EditEntrySheet from '@/components/EditEntrySheet';
 import { TimeEntry } from '@/types';
 
@@ -21,6 +24,13 @@ export default function Timeline() {
   const { t, entries, deleteEntry, getProject } = useApp();
   const [editEntry, setEditEntry] = useState<TimeEntry | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+
+  // Default: last 1 month
+  const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const defaultTo = new Date().toISOString().slice(0, 10);
+  const [fromDate, setFromDate] = useState(defaultFrom);
+  const [toDate, setToDate] = useState(defaultTo);
 
   const grouped = useMemo(() => {
     const sorted = [...entries].sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
@@ -38,9 +48,22 @@ export default function Timeline() {
     setEditOpen(true);
   };
 
+  const handleExportClick = () => {
+    setFromDate(defaultFrom);
+    setToDate(defaultTo);
+    setExportOpen(true);
+  };
+
   const exportCsv = useCallback(() => {
+    const fromTs = new Date(fromDate).getTime();
+    const toTs = new Date(toDate + 'T23:59:59').getTime();
+    const filtered = entries.filter(e => {
+      const ts = new Date(e.startAt).getTime();
+      return ts >= fromTs && ts <= toTs;
+    });
+    const sorted = [...filtered].sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
+
     const header = 'Project,Start,End,Duration (min),Pauses,Note\n';
-    const sorted = [...entries].sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
     const rows = sorted.map(e => {
       const project = getProject(e.projectId);
       const start = new Date(e.startAt);
@@ -67,10 +90,11 @@ export default function Timeline() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `sa3aty-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `sa3aty-${fromDate}_${toDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [entries, getProject]);
+    setExportOpen(false);
+  }, [entries, getProject, fromDate, toDate]);
 
   return (
     <div className="min-h-screen pb-24 pt-safe">
@@ -78,7 +102,7 @@ export default function Timeline() {
         <h1 className="text-2xl font-bold text-foreground">{t('timeline')}</h1>
         {entries.length > 0 && (
           <button
-            onClick={exportCsv}
+            onClick={handleExportClick}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
             <Download className="w-4 h-4" />
@@ -167,6 +191,34 @@ export default function Timeline() {
       )}
 
       <EditEntrySheet entry={editEntry} open={editOpen} onOpenChange={setEditOpen} />
+
+      {/* Export date range sheet */}
+      <Sheet open={exportOpen} onOpenChange={setExportOpen}>
+        <SheetContent side="bottom" className="rounded-t-3xl pb-safe">
+          <SheetHeader>
+            <SheetTitle>{t('exportCsv')}</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">{t('from')}</label>
+              <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="rounded-xl h-12" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">{t('to')}</label>
+              <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="rounded-xl h-12" />
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={exportCsv} className="flex-1 rounded-xl h-12">
+                <Download className="w-4 h-4 me-2" />
+                {t('export')}
+              </Button>
+              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-xl h-12">
+                {t('cancel')}
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

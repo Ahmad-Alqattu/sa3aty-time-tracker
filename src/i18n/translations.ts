@@ -49,6 +49,9 @@ const translations = {
     minutesAgo: 'كم دقيقة قبل؟',
     next: 'التالي',
     exportCsv: 'تصدير CSV',
+    from: 'من',
+    to: 'إلى',
+    export: 'تصدير',
   },
   en: {
     appName: "Sa3aty",
@@ -100,6 +103,9 @@ const translations = {
     minutesAgo: 'How many minutes ago?',
     next: 'Next',
     exportCsv: 'Export CSV',
+    from: 'From',
+    to: 'To',
+    export: 'Export',
   },
 } as const;
 
