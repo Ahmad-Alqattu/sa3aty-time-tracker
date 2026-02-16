@@ -137,8 +137,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
         audioRef.current = null;
       }
     };
-    // Volume is intentionally excluded - it's handled by the volume effect
-    // selectedSound is included to reload audio when sound type changes
+    // Only re-initialize when selectedSound changes (not volume - handled separately below)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSound]);
 
@@ -186,11 +185,6 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     setSelectedSound(value as SoundType);
     // Stop current playback when changing sound
     setIsPlaying(false);
-  };
-
-  const getCurrentSoundName = () => {
-    const sound = SOUND_OPTIONS.find(s => s.id === selectedSound);
-    return sound ? sound.nameAr : '';
   };
 
   if (compact) {
