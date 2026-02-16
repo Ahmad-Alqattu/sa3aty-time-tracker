@@ -10,6 +10,8 @@ export default function ForgotStartSheet() {
   const [open, setOpen] = useState(false);
   const [projectId, setProjectId] = useState<string | undefined>();
   const [minutesAgo, setMinutesAgo] = useState(30);
+  const [customMode, setCustomMode] = useState(false);
+  const [customMinutes, setCustomMinutes] = useState('');
   const [stillWorking, setStillWorking] = useState(true);
   const [note, setNote] = useState('');
 
@@ -27,10 +29,20 @@ export default function ForgotStartSheet() {
     setOpen(false);
     setNote('');
     setMinutesAgo(30);
+    setCustomMode(false);
+    setCustomMinutes('');
+  };
+
+  const handleCustomConfirm = () => {
+    const mins = parseInt(customMinutes);
+    if (mins > 0) {
+      setMinutesAgo(mins);
+      setCustomMode(false);
+    }
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setCustomMode(false); setCustomMinutes(''); } }}>
       <SheetTrigger asChild>
         <button className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 transition-colors">
           <Clock className="w-4 h-4" />
@@ -71,22 +83,48 @@ export default function ForgotStartSheet() {
             </div>
           )}
 
-          {/* Time presets */}
+          {/* Time presets + custom */}
           <div className="space-y-2">
             <label className="text-sm text-muted-foreground">{t('startTime')}</label>
-            <div className="flex flex-wrap gap-2">
-              {presets.map(p => (
+            {!customMode ? (
+              <div className="flex flex-wrap gap-2">
+                {presets.map(p => (
+                  <button
+                    key={p.value}
+                    onClick={() => setMinutesAgo(p.value)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                      minutesAgo === p.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {p.label}{t('minutes')}
+                  </button>
+                ))}
                 <button
-                  key={p.value}
-                  onClick={() => setMinutesAgo(p.value)}
+                  onClick={() => { setCustomMode(true); setCustomMinutes(String(minutesAgo)); }}
                   className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                    minutesAgo === p.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                    !presets.some(p => p.value === minutesAgo) ? 'bg-primary text-primary-foreground' : 'bg-accent/10 text-accent-foreground border border-accent/20'
                   }`}
                 >
-                  {p.label}{t('minutes')}
+                  {!presets.some(p => p.value === minutesAgo) ? `${minutesAgo}${t('minutes')}` : t('customTime')}
                 </button>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className="flex gap-2 items-end">
+                <Input
+                  type="number"
+                  min={1}
+                  value={customMinutes}
+                  onChange={e => setCustomMinutes(e.target.value)}
+                  placeholder="45"
+                  className="rounded-xl h-12 text-center flex-1"
+                  autoFocus
+                />
+                <span className="text-sm text-muted-foreground pb-3">{t('minutes')}</span>
+                <Button onClick={handleCustomConfirm} size="sm" className="rounded-xl h-12">
+                  {t('save')}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Still working toggle */}

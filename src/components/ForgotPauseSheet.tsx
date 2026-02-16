@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { AlertTriangle } from 'lucide-react';
 
 export default function ForgotPauseSheet() {
   const { t, timerState, fixForgotPause } = useApp();
   const [open, setOpen] = useState(false);
   const [minutesAgo, setMinutesAgo] = useState<number | null>(null);
-  const [step, setStep] = useState<'select' | 'action'>('select');
+  const [step, setStep] = useState<'select' | 'custom' | 'action'>('select');
+  const [customMinutes, setCustomMinutes] = useState('');
 
   if (timerState !== 'running') return null;
 
@@ -23,17 +25,30 @@ export default function ForgotPauseSheet() {
     setStep('action');
   };
 
+  const handleCustomConfirm = () => {
+    const mins = parseInt(customMinutes);
+    if (mins > 0) {
+      setMinutesAgo(mins);
+      setStep('action');
+    }
+  };
+
   const handleAction = (action: 'end' | 'resume') => {
     if (minutesAgo !== null) {
       fixForgotPause(minutesAgo, action);
     }
+    resetAndClose();
+  };
+
+  const resetAndClose = () => {
     setOpen(false);
     setStep('select');
     setMinutesAgo(null);
+    setCustomMinutes('');
   };
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setStep('select'); setMinutesAgo(null); } }}>
+    <Sheet open={open} onOpenChange={(v) => { if (!v) resetAndClose(); else setOpen(true); }}>
       <SheetTrigger asChild>
         <button className="flex items-center gap-2 px-4 py-3 rounded-xl bg-accent/10 text-accent-foreground text-sm font-medium hover:bg-accent/20 transition-colors border border-accent/20">
           <AlertTriangle className="w-4 h-4 text-timer-paused" />
@@ -56,6 +71,35 @@ export default function ForgotPauseSheet() {
                 {p.label}
               </button>
             ))}
+            <button
+              onClick={() => setStep('custom')}
+              className="w-full px-4 py-4 rounded-xl bg-accent/10 text-accent-foreground text-start font-medium hover:bg-accent/20 transition-colors border border-accent/20"
+            >
+              {t('customTime')}
+            </button>
+          </div>
+        )}
+
+        {step === 'custom' && (
+          <div className="mt-4 space-y-4">
+            <label className="text-sm text-muted-foreground">{t('minutesAgo')}</label>
+            <Input
+              type="number"
+              min={1}
+              value={customMinutes}
+              onChange={e => setCustomMinutes(e.target.value)}
+              placeholder="45"
+              className="rounded-xl h-14 text-lg text-center"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <Button onClick={handleCustomConfirm} disabled={!customMinutes || parseInt(customMinutes) <= 0} className="flex-1 rounded-xl h-12">
+                {t('next')}
+              </Button>
+              <Button variant="outline" onClick={() => setStep('select')} className="rounded-xl h-12">
+                {t('cancel')}
+              </Button>
+            </div>
           </div>
         )}
 
