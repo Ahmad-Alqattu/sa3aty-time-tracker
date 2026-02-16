@@ -107,7 +107,7 @@ function SoundButton({
             className={cn(
               "relative h-12 w-12 rounded-xl transition-all duration-300 border-0",
               isEnabled && "shadow-lg scale-105",
-              isEnabled ? sound.color : "bg-white/10 hover:bg-white/20"
+            isEnabled ? sound.color : "bg-white/20 hover:bg-white/30 border border-white/20"
             )}
           >
             <AudioVisualizer isActive={isEnabled} />
@@ -374,11 +374,15 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     </div>
   );
 
-  // Compact version for mobile
+  // Compact version for mobile - iOS 26 Liquid Glass Style
   if (compact) {
     return (
       <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40">
-        <div className="flex flex-col items-center gap-3 bg-black/30 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border border-white/10">
+        <div className="flex flex-col items-center gap-3 bg-white/15 backdrop-blur-3xl rounded-3xl p-4 shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/30"
+          style={{
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.3)'
+          }}>
           <div className="flex items-center gap-2">
             {SOUND_OPTIONS.map(sound => (
               <SoundButton
@@ -394,7 +398,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-12 w-12 rounded-xl bg-white/10 hover:bg-white/20"
+                  className="h-12 w-12 rounded-2xl bg-white/20 hover:bg-white/30 border border-white/20 transition-all"
                 >
                   <Settings className="h-5 w-5" />
                 </Button>
@@ -409,7 +413,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
           </div>
 
           <div className="flex items-center gap-2 w-full px-1">
-            <VolumeX className="h-4 w-4 text-white/60 shrink-0" />
+            <VolumeX className="h-4 w-4 text-white/70 shrink-0" />
             <Slider
               value={[masterVolume]}
               onValueChange={(values) => setMasterVolume(values[0])}
@@ -417,7 +421,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
               step={1}
               className="flex-1"
             />
-            <Volume2 className="h-4 w-4 text-white/60 shrink-0" />
+            <Volume2 className="h-4 w-4 text-white/70 shrink-0" />
           </div>
         </div>
       </div>
