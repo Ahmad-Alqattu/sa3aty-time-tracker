@@ -73,6 +73,39 @@ This project is built with:
 - ✅ **RTL Support**: Full Arabic language support with right-to-left layout
 - ✅ **Auto-Deployment**: Automatic deployment to GitHub Pages on every push
 
+## Ambient Sounds Setup
+
+The application includes ambient sound features (rain, cafe, brown noise) to help with focus and productivity. 
+
+**Current Setup:**
+- The placeholder audio files in `/public` are small test files (1KB each)
+- The app automatically falls back to CDN sources when local files are invalid
+- For best offline experience, you can replace the placeholder files with full audio files
+
+**To add full audio files:**
+1. Download the audio files from:
+   - Rain: https://www.soundjay.com/nature/rain-07.mp3
+   - Cafe: https://upload.wikimedia.org/wikipedia/commons/a/ab/Ambience_of_a_busy_cafe.mp3
+   - Brown Noise: https://cdn.pixabay.com/download/audio/2022/02/03/audio_5131105e4c.mp3
+2. Place them in the `/public` directory with exact names: `rain-07.mp3`, `cafe-ambience.mp3`, `brown-noise.mp3`
+
+See `/public/AUDIO_FILES_AR.md` for detailed instructions in Arabic.
+
+## Known Issues & Solutions
+
+### 404 Error on Page Refresh
+
+This project is a Single Page Application (SPA) deployed on GitHub Pages. If you encounter a 404 error when refreshing a page or accessing a direct URL:
+
+**Solution:** The repository includes a `404.html` file that automatically redirects to the correct route. Make sure this file is deployed with your build to GitHub Pages.
+
+**How it works:**
+- When GitHub Pages receives a request for a non-existent path (e.g., `/sa3aty-time-tracker/timeline`)
+- It serves the `404.html` file
+- The `404.html` script stores the path and redirects to `index.html`
+- The `index.html` script restores the correct client-side route
+
+
 ## How can I deploy this project?
 
 ### GitHub Pages (Recommended)
