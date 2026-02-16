@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { Trash2, Pencil } from 'lucide-react';
+import { Trash2, Pencil, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import EditEntrySheet from '@/components/EditEntrySheet';
 import { TimeEntry } from '@/types';
@@ -38,10 +38,53 @@ export default function Timeline() {
     setEditOpen(true);
   };
 
+  const exportCsv = useCallback(() => {
+    const header = 'Project,Start,End,Duration (min),Pauses,Note\n';
+    const sorted = [...entries].sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
+    const rows = sorted.map(e => {
+      const project = getProject(e.projectId);
+      const start = new Date(e.startAt);
+      const end = e.endAt ? new Date(e.endAt) : null;
+      const pausedMs = e.pauses.reduce((s, p) => {
+        const ps = new Date(p.pauseStart).getTime();
+        const pe = p.pauseEnd ? new Date(p.pauseEnd).getTime() : Date.now();
+        return s + (pe - ps);
+      }, 0);
+      const durationMs = (end ? end.getTime() : Date.now()) - start.getTime() - pausedMs;
+      const durationMin = Math.round(durationMs / 60000);
+      const escapeCsv = (s: string) => `"${s.replace(/"/g, '""')}"`;
+      return [
+        escapeCsv(project?.name || ''),
+        start.toISOString(),
+        end ? end.toISOString() : '',
+        durationMin,
+        e.pauses.length,
+        escapeCsv(e.note || ''),
+      ].join(',');
+    }).join('\n');
+
+    const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sa3aty-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [entries, getProject]);
+
   return (
     <div className="min-h-screen pb-24 pt-safe">
-      <header className="px-6 pt-8 pb-4">
+      <header className="px-6 pt-8 pb-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">{t('timeline')}</h1>
+        {entries.length > 0 && (
+          <button
+            onClick={exportCsv}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            {t('exportCsv')}
+          </button>
+        )}
       </header>
 
       {grouped.length === 0 ? (
