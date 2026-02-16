@@ -3,16 +3,52 @@ import { Volume2, VolumeX, Play, Pause } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApp } from '@/contexts/AppContext';
 
 interface AmbientSoundPlayerProps {
   compact?: boolean;
 }
 
+type SoundType = 'rain' | 'cafe' | 'brownNoise';
+
+interface SoundOption {
+  id: SoundType;
+  name: string;
+  nameAr: string;
+  localPath: string;
+  cdnFallback: string;
+}
+
+const SOUND_OPTIONS: SoundOption[] = [
+  {
+    id: 'rain',
+    name: 'Rain',
+    nameAr: 'مطر',
+    localPath: '/rain-07.mp3',
+    cdnFallback: 'https://www.soundjay.com/nature/rain-07.mp3'
+  },
+  {
+    id: 'cafe',
+    name: 'Cafe',
+    nameAr: 'مقهى',
+    localPath: '/cafe-ambience.mp3',
+    cdnFallback: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Ambience_of_a_busy_cafe.mp3'
+  },
+  {
+    id: 'brownNoise',
+    name: 'Brown Noise',
+    nameAr: 'ضجيج بني',
+    localPath: '/brown-noise.mp3',
+    cdnFallback: 'https://cdn.pixabay.com/download/audio/2022/02/03/audio_5131105e4c.mp3'
+  }
+];
+
 export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlayerProps) {
   const { t } = useApp();
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(50);
+  const [selectedSound, setSelectedSound] = useState<SoundType>('rain');
   const [audioError, setAudioError] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -20,12 +56,16 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
   useEffect(() => {
     const savedVolume = localStorage.getItem('ambientVolume');
     const savedIsPlaying = localStorage.getItem('ambientIsPlaying');
+    const savedSound = localStorage.getItem('ambientSound') as SoundType;
     
     if (savedVolume) {
       setVolume(parseInt(savedVolume, 10));
     }
     if (savedIsPlaying === 'true') {
       setIsPlaying(true);
+    }
+    if (savedSound && SOUND_OPTIONS.find(s => s.id === savedSound)) {
+      setSelectedSound(savedSound);
     }
   }, []);
 
@@ -34,10 +74,13 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     // Determine the base path based on environment
     const basePath = import.meta.env.PROD ? '/sa3aty-time-tracker' : '';
     
+    // Get the current sound option
+    const currentSound = SOUND_OPTIONS.find(s => s.id === selectedSound) || SOUND_OPTIONS[0];
+    
     // Try local audio file first, then fallback to CDN
     const audioSources = [
-      `${basePath}/rain-ambient.mp3`,
-      'https://cdn.pixabay.com/download/audio/2022/05/13/audio_257112e488.mp3'
+      `${basePath}${currentSound.localPath}`,
+      currentSound.cdnFallback
     ];
     
     let currentSourceIndex = 0;
@@ -58,7 +101,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     
     const tryNextSource = () => {
       if (currentSourceIndex >= audioSources.length) {
-        console.warn('All audio sources failed to load');
+        console.warn('All audio sources failed to load for:', selectedSound);
         setAudioError(true);
         setIsPlaying(false);
         return;
@@ -72,13 +115,13 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
       audioRef.current.volume = volume / 100;
       
       currentErrorHandler = () => {
-        console.warn(`Failed to load audio from source ${currentSourceIndex + 1}/${audioSources.length}`);
+        console.warn(`Failed to load audio from source ${currentSourceIndex + 1}/${audioSources.length} for ${selectedSound}`);
         currentSourceIndex++;
         tryNextSource();
       };
       
       currentLoadedHandler = () => {
-        console.log('Audio loaded successfully');
+        console.log('Audio loaded successfully:', selectedSound);
         setAudioError(false);
       };
       
@@ -94,9 +137,10 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
         audioRef.current = null;
       }
     };
-    // Volume is intentionally excluded - it's handled by the volume effect (lines 102-107)
+    // Volume is intentionally excluded - it's handled by the volume effect
+    // selectedSound is included to reload audio when sound type changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedSound]);
 
   // Handle play/pause
   useEffect(() => {
@@ -125,12 +169,28 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     }
   }, [volume]);
 
+  // Save selected sound preference
+  useEffect(() => {
+    localStorage.setItem('ambientSound', selectedSound);
+  }, [selectedSound]);
+
   const togglePlay = () => {
     if (audioError) {
       console.warn('Audio not available');
       return;
     }
     setIsPlaying(!isPlaying);
+  };
+
+  const handleSoundChange = (value: string) => {
+    setSelectedSound(value as SoundType);
+    // Stop current playback when changing sound
+    setIsPlaying(false);
+  };
+
+  const getCurrentSoundName = () => {
+    const sound = SOUND_OPTIONS.find(s => s.id === selectedSound);
+    return sound ? sound.nameAr : '';
   };
 
   if (compact) {
@@ -169,8 +229,23 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
               </Button>
             </div>
             <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">نوع الصوت</div>
+              <Select value={selectedSound} onValueChange={handleSoundChange} disabled={audioError}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SOUND_OPTIONS.map(sound => (
+                    <SelectItem key={sound.id} value={sound.id}>
+                      {sound.nameAr} ({sound.name})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{t('rainSound')}</span>
+                <span>الصوت</span>
                 <span>{volume}%</span>
               </div>
               <Slider
@@ -207,8 +282,23 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
         </Button>
       </div>
       <div className="space-y-2">
+        <div className="text-xs text-muted-foreground">نوع الصوت</div>
+        <Select value={selectedSound} onValueChange={handleSoundChange} disabled={audioError}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SOUND_OPTIONS.map(sound => (
+              <SelectItem key={sound.id} value={sound.id}>
+                {sound.nameAr} ({sound.name})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{t('rainSound')}</span>
+          <span>الصوت</span>
           <span>{volume}%</span>
         </div>
         <Slider
