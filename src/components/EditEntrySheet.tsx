@@ -15,22 +15,30 @@ export default function EditEntrySheet({ entry, open, onOpenChange }: Props) {
   const { t, projects, updateEntry, getProject } = useApp();
   const [projectId, setProjectId] = useState<string | undefined>();
   const [note, setNote] = useState('');
+  const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
 
   useEffect(() => {
     if (entry) {
       setProjectId(entry.projectId);
       setNote(entry.note || '');
+      setStartTime(new Date(entry.startAt).toTimeString().slice(0, 5));
       setEndTime(entry.endAt ? new Date(entry.endAt).toTimeString().slice(0, 5) : '');
     }
   }, [entry]);
 
   const handleSave = () => {
     if (!entry) return;
-    const updates: Partial<Pick<TimeEntry, 'projectId' | 'endAt' | 'note'>> = {
+    const updates: Partial<Pick<TimeEntry, 'projectId' | 'startAt' | 'endAt' | 'note'>> = {
       projectId,
       note: note || undefined,
     };
+    if (startTime) {
+      const d = new Date(entry.startAt);
+      const [h, m] = startTime.split(':').map(Number);
+      d.setHours(h, m);
+      updates.startAt = d.toISOString();
+    }
     if (endTime && entry.endAt) {
       const d = new Date(entry.endAt);
       const [h, m] = endTime.split(':').map(Number);
@@ -78,6 +86,17 @@ export default function EditEntrySheet({ entry, open, onOpenChange }: Props) {
               </div>
             </div>
           )}
+
+          {/* Start time */}
+          <div className="space-y-2">
+            <label className="text-sm text-muted-foreground">{t('startTime')}</label>
+            <Input
+              type="time"
+              value={startTime}
+              onChange={e => setStartTime(e.target.value)}
+              className="rounded-xl h-12"
+            />
+          </div>
 
           {/* End time */}
           {entry.endAt && (
