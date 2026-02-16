@@ -23,7 +23,8 @@ export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
       <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-card border-e border-border">
         <div className="flex flex-col flex-1 overflow-y-auto">
           {/* Logo/Title */}
-          <div className="flex items-center justify-center h-16 px-4 border-b border-border">
+          <div className="flex items-center justify-center gap-3 h-20 px-4 border-b border-border">
+            <img src="/logo.png" alt="ساعتي" className="h-14 w-14 object-contain" />
             <h1 className="text-xl font-bold text-primary">{t('appName')}</h1>
           </div>
 
