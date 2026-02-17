@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { AppProvider } from "@/contexts/AppContext";
 import ResponsiveLayout from "@/components/ResponsiveLayout";
 import Index from "./pages/Index";
@@ -19,20 +20,22 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AppProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter basename={basename}>
-            <ResponsiveLayout>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/timeline" element={<Timeline />} />
-                <Route path="/projects" element={<Projects />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </ResponsiveLayout>
-          </BrowserRouter>
-        </AppProvider>
+        <AuthProvider>
+          <AppProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter basename={basename}>
+              <ResponsiveLayout>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/timeline" element={<Timeline />} />
+                  <Route path="/projects" element={<Projects />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </ResponsiveLayout>
+            </BrowserRouter>
+          </AppProvider>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

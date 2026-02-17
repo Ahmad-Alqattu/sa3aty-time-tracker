@@ -3,6 +3,7 @@ import { NavLink as RouterNavLink } from 'react-router-dom';
 import { Home, Clock, FolderOpen, Globe } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import AmbientSoundPlayer from './AmbientSoundPlayer';
+import UserMenu, { SyncStatus } from './UserMenu';
 
 interface ResponsiveLayoutProps {
   children: ReactNode;
@@ -50,7 +51,7 @@ export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
           </nav>
 
           {/* Language Toggle */}
-          <div className="px-4 py-4 border-t border-border">
+          <div className="px-4 py-4 border-t border-border space-y-2">
             <button
               onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
               className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -58,6 +59,10 @@ export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
               <Globe className="w-5 h-5" />
               <span>{language === 'ar' ? 'English' : 'عربي'}</span>
             </button>
+            <div className="flex items-center justify-between px-4">
+              <SyncStatus />
+              <UserMenu />
+            </div>
           </div>
 
           {/* Ambient Sound Player */}
@@ -69,6 +74,19 @@ export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
 
       {/* Main Content Area */}
       <main className="flex-1 lg:ms-64 overflow-auto">
+        {/* Mobile Header */}
+        <header className="lg:hidden sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border">
+          <div className="flex items-center justify-between h-14 px-4">
+            <div className="flex items-center gap-2">
+              <img src={`${import.meta.env.BASE_URL}logo.png`} alt="ساعتي" className="h-8 w-8 object-contain" />
+              <h1 className="text-lg font-bold text-primary">{t('appName')}</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <SyncStatus />
+              <UserMenu />
+            </div>
+          </div>
+        </header>
         <div className="max-w-4xl mx-auto">
           {children}
         </div>

@@ -1,6 +1,16 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Project, TimeEntry, TimePause, TimerState, Language } from '@/types';
 import translations, { TranslationKey } from '@/i18n/translations';
+import { useAuth } from './AuthContext';
+import { 
+  subscribeToProjects, 
+  subscribeToEntries, 
+  syncProjectToFirestore, 
+  syncEntryToFirestore,
+  deleteProjectFromFirestore,
+  deleteEntryFromFirestore,
+  bulkSyncToFirestore
+} from '@/lib/firestoreSync';
 
 interface AppContextType {
   language: Language;
@@ -55,12 +65,63 @@ function saveJson(key: string, value: unknown): void {
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [language, setLanguageState] = useState<Language>(() =>
     (localStorage.getItem('sa3aty-lang') as Language) || 'ar'
   );
   const [projects, setProjects] = useState<Project[]>(() => loadJson('sa3aty-projects', []));
   const [entries, setEntries] = useState<TimeEntry[]>(() => loadJson('sa3aty-entries', []));
   const [tick, setTick] = useState(0);
+  const [isSynced, setIsSynced] = useState(false);
+  const hasMigratedRef = useRef(false);
+
+  // Subscribe to Firestore when user logs in
+  useEffect(() => {
+    if (!user) {
+      setIsSynced(false);
+      hasMigratedRef.current = false;
+      return;
+    }
+
+    // Migrate localStorage data to Firestore on first login
+    const migrateData = async () => {
+      if (hasMigratedRef.current) return;
+      
+      const localProjects = loadJson<Project[]>('sa3aty-projects', []);
+      const localEntries = loadJson<TimeEntry[]>('sa3aty-entries', []);
+      
+      if (localProjects.length > 0 || localEntries.length > 0) {
+        try {
+          await bulkSyncToFirestore(user.uid, localProjects, localEntries);
+          console.log('Migrated local data to Firestore');
+        } catch (error) {
+          console.error('Failed to migrate data:', error);
+        }
+      }
+      hasMigratedRef.current = true;
+    };
+
+    migrateData();
+
+    // Subscribe to projects
+    const unsubProjects = subscribeToProjects(user.uid, (firestoreProjects) => {
+      setProjects(firestoreProjects);
+      setIsSynced(true);
+    });
+
+    // Subscribe to entries
+    const unsubEntries = subscribeToEntries(user.uid, (firestoreEntries) => {
+      // Sort entries by startAt for proper display (newest first)
+      setEntries(firestoreEntries.sort((a, b) => 
+        new Date(b.startAt).getTime() - new Date(a.startAt).getTime()
+      ));
+    });
+
+    return () => {
+      unsubProjects();
+      unsubEntries();
+    };
+  }, [user]);
 
   // Derived
   const activeEntry = useMemo(() => entries.find(e => !e.endAt) || null, [entries]);
@@ -77,9 +138,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [timerState]);
 
-  // Persist with error handling
-  useEffect(() => { saveJson('sa3aty-projects', projects); }, [projects]);
-  useEffect(() => { saveJson('sa3aty-entries', entries); }, [entries]);
+  // Persist to localStorage only when not logged in (Firestore handles it when logged in)
+  useEffect(() => { 
+    if (!user) saveJson('sa3aty-projects', projects); 
+  }, [projects, user]);
+  useEffect(() => { 
+    if (!user) saveJson('sa3aty-entries', entries); 
+  }, [entries, user]);
 
   // Language
   const setLanguage = useCallback((lang: Language) => {
@@ -152,17 +217,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString(),
     };
     setEntries(prev => [...prev, entry]);
-  }, [activeEntry]);
+    if (user) syncEntryToFirestore(user.uid, entry).catch(console.error);
+  }, [activeEntry, user]);
 
   const stopTimer = useCallback(() => {
     if (!activeEntry) return;
-    setEntries(prev => prev.map(e => {
-      if (e.id !== activeEntry.id) return e;
-      const pauses = e.pauses.map(p =>
+    const updatedEntry = {
+      ...activeEntry,
+      pauses: activeEntry.pauses.map(p =>
         p.pauseEnd ? p : { ...p, pauseEnd: new Date().toISOString() }
-      );
-      return { ...e, pauses, endAt: new Date().toISOString() };
-    }));
+      ),
+      endAt: new Date().toISOString()
+    };
+    setEntries(prev => prev.map(e => e.id === activeEntry.id ? updatedEntry : e));
+    if (user) syncEntryToFirestore(user.uid, updatedEntry).catch(console.error);
   }, [activeEntry]);
 
   const pauseTimer = useCallback(() => {
@@ -171,21 +239,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       id: crypto.randomUUID(),
       pauseStart: new Date().toISOString(),
     };
-    setEntries(prev => prev.map(e =>
-      e.id === activeEntry.id ? { ...e, pauses: [...e.pauses, pause] } : e
-    ));
-  }, [activeEntry, timerState]);
+    const updatedEntry = { ...activeEntry, pauses: [...activeEntry.pauses, pause] };
+    setEntries(prev => prev.map(e => e.id === activeEntry.id ? updatedEntry : e));
+    if (user) syncEntryToFirestore(user.uid, updatedEntry).catch(console.error);
+  }, [activeEntry, timerState, user]);
 
   const resumeTimer = useCallback(() => {
     if (!activeEntry || timerState !== 'paused') return;
-    setEntries(prev => prev.map(e => {
-      if (e.id !== activeEntry.id) return e;
-      const pauses = e.pauses.map(p =>
+    const updatedEntry = {
+      ...activeEntry,
+      pauses: activeEntry.pauses.map(p =>
         p.pauseEnd ? p : { ...p, pauseEnd: new Date().toISOString() }
-      );
-      return { ...e, pauses };
-    }));
-  }, [activeEntry, timerState]);
+      )
+    };
+    setEntries(prev => prev.map(e => e.id === activeEntry.id ? updatedEntry : e));
+    if (user) syncEntryToFirestore(user.uid, updatedEntry).catch(console.error);
+  }, [activeEntry, timerState, user]);
 
   const addQuickTime = useCallback((minutes: number) => {
     const end = new Date();
@@ -205,7 +274,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString(),
     };
     setEntries(prev => [...prev, entry]);
-  }, [entries]);
+    if (user) syncEntryToFirestore(user.uid, entry).catch(console.error);
+  }, [entries, user]);
 
   const addRetroEntry = useCallback((projectId: string | undefined, startAt: Date, endAt: Date | null, note?: string) => {
     // Validate dates
@@ -233,56 +303,61 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString(),
     };
     setEntries(prev => [...prev, entry]);
-  }, []);
+    if (user) syncEntryToFirestore(user.uid, entry).catch(console.error);
+  }, [user]);
 
   const fixForgotPause = useCallback((minutesAgo: number, action: 'end' | 'resume') => {
     if (!activeEntry) return;
     const pauseStart = new Date(Date.now() - minutesAgo * 60000);
     const now = new Date();
 
-    setEntries(prev => prev.map(e => {
-      if (e.id !== activeEntry.id) return e;
-      const newPause: TimePause = {
-        id: crypto.randomUUID(),
-        pauseStart: pauseStart.toISOString(),
-        pauseEnd: now.toISOString(),
-      };
-      if (action === 'end') {
-        return { ...e, pauses: [...e.pauses, newPause], endAt: now.toISOString() };
-      }
-      return { ...e, pauses: [...e.pauses, newPause] };
-    }));
-  }, [activeEntry]);
+    const newPause: TimePause = {
+      id: crypto.randomUUID(),
+      pauseStart: pauseStart.toISOString(),
+      pauseEnd: now.toISOString(),
+    };
+    const updatedEntry = action === 'end'
+      ? { ...activeEntry, pauses: [...activeEntry.pauses, newPause], endAt: now.toISOString() }
+      : { ...activeEntry, pauses: [...activeEntry.pauses, newPause] };
+    
+    setEntries(prev => prev.map(e => e.id === activeEntry.id ? updatedEntry : e));
+    if (user) syncEntryToFirestore(user.uid, updatedEntry).catch(console.error);
+  }, [activeEntry, user]);
 
   const deleteEntry = useCallback((id: string) => {
     setEntries(prev => prev.filter(e => e.id !== id));
-  }, []);
+    if (user) deleteEntryFromFirestore(user.uid, id).catch(console.error);
+  }, [user]);
 
   const fixForgotStop = useCallback((minutesAgo: number) => {
     if (!activeEntry) return;
     const endTime = new Date(Date.now() - minutesAgo * 60000);
-    setEntries(prev => prev.map(e => {
-      if (e.id !== activeEntry.id) return e;
-      // Close any open pauses
-      const pauses = e.pauses.map(p =>
+    const updatedEntry = {
+      ...activeEntry,
+      pauses: activeEntry.pauses.map(p =>
         p.pauseEnd ? p : { ...p, pauseEnd: endTime.toISOString() }
-      );
-      return { ...e, pauses, endAt: endTime.toISOString() };
-    }));
-  }, [activeEntry]);
+      ),
+      endAt: endTime.toISOString()
+    };
+    setEntries(prev => prev.map(e => e.id === activeEntry.id ? updatedEntry : e));
+    if (user) syncEntryToFirestore(user.uid, updatedEntry).catch(console.error);
+  }, [activeEntry, user]);
 
   const updateEntry = useCallback((id: string, updates: Partial<Pick<TimeEntry, 'projectId' | 'startAt' | 'endAt' | 'note'>>) => {
-    setEntries(prev => prev.map(e =>
-      e.id === id ? { ...e, ...updates } : e
-    ));
-  }, []);
+    setEntries(prev => {
+      const updated = prev.map(e => e.id === id ? { ...e, ...updates } : e);
+      const entry = updated.find(e => e.id === id);
+      if (user && entry) syncEntryToFirestore(user.uid, entry).catch(console.error);
+      return updated;
+    });
+  }, [user]);
 
   const updateActiveProject = useCallback((projectId?: string) => {
     if (!activeEntry) return;
-    setEntries(prev => prev.map(e =>
-      e.id === activeEntry.id ? { ...e, projectId } : e
-    ));
-  }, [activeEntry]);
+    const updatedEntry = { ...activeEntry, projectId };
+    setEntries(prev => prev.map(e => e.id === activeEntry.id ? updatedEntry : e));
+    if (user) syncEntryToFirestore(user.uid, updatedEntry).catch(console.error);
+  }, [activeEntry, user]);
 
   const addProject = useCallback((name: string, color: string, rate?: number) => {
     // Validate inputs
@@ -308,11 +383,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString(),
     };
     setProjects(prev => [...prev, project]);
-  }, []);
+    if (user) syncProjectToFirestore(user.uid, project).catch(console.error);
+  }, [user]);
 
   const deleteProject = useCallback((id: string) => {
     setProjects(prev => prev.filter(p => p.id !== id));
-  }, []);
+    if (user) deleteProjectFromFirestore(user.uid, id).catch(console.error);
+  }, [user]);
 
   const getProject = useCallback((id?: string) => {
     if (!id) return undefined;
