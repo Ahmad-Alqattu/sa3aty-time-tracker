@@ -93,7 +93,7 @@ export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
         </div>
       )}
 
-      {/* Mobile Bottom Navigation */}}
+      {/* Mobile Bottom Navigation */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border safe-area-bottom">
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
           {links.map(link => (
