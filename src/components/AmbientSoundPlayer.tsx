@@ -180,25 +180,52 @@ function MixerSlider({
   );
 }
 
+// Helper to load initial state from localStorage
+function loadInitialState() {
+  try {
+    const savedMasterVolume = localStorage.getItem('ambientMasterVolume');
+    const savedIndividualVolumes = localStorage.getItem('ambientIndividualVolumes');
+    const savedEnabledSounds = localStorage.getItem('ambientEnabledSounds');
+    const savedTimerSync = localStorage.getItem('ambientSoundTimerSync');
+    const savedPaused = getManuallyPaused();
+    
+    return {
+      masterVolume: savedMasterVolume ? parseInt(savedMasterVolume, 10) : 50,
+      individualVolumes: savedIndividualVolumes ? JSON.parse(savedIndividualVolumes) : {
+        rain: 50, fireplace: 50, waves: 50, cafe: 50
+      },
+      enabledSounds: savedEnabledSounds ? new Set(JSON.parse(savedEnabledSounds) as SoundType[]) : new Set<SoundType>(),
+      soundTimerSync: savedTimerSync === 'true',
+      isPaused: savedPaused
+    };
+  } catch (e) {
+    console.error('Failed to load ambient sound preferences', e);
+    return {
+      masterVolume: 50,
+      individualVolumes: { rain: 50, fireplace: 50, waves: 50, cafe: 50 },
+      enabledSounds: new Set<SoundType>(),
+      soundTimerSync: false,
+      isPaused: false
+    };
+  }
+}
+
 export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }: AmbientSoundPlayerProps) {
   // Handle legacy compact prop
   const effectiveMode = compact ? 'floating' : mode;
   
-  const [masterVolume, setMasterVolume] = useState(50);
-  const [individualVolumes, setIndividualVolumes] = useState<Record<SoundType, number>>({
-    rain: 50,
-    fireplace: 50,
-    waves: 50,
-    cafe: 50
-  });
-  const [enabledSounds, setEnabledSounds] = useState<Set<SoundType>>(new Set());
-  const [isPaused, setIsPaused] = useState(false); // Paused state (keeps settings)
+  // Load initial state synchronously from localStorage
+  const initialState = useRef(loadInitialState());
+  
+  const [masterVolume, setMasterVolume] = useState(initialState.current.masterVolume);
+  const [individualVolumes, setIndividualVolumes] = useState<Record<SoundType, number>>(initialState.current.individualVolumes);
+  const [enabledSounds, setEnabledSounds] = useState<Set<SoundType>>(initialState.current.enabledSounds);
+  const [isPaused, setIsPaused] = useState(initialState.current.isPaused);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
-  const [soundTimerSync, setSoundTimerSync] = useState(false);
+  const [soundTimerSync, setSoundTimerSync] = useState(initialState.current.soundTimerSync);
   const isInitialized = useRef(false);
-  const preferencesLoaded = useRef(false);
 
   // Initialize audio manager
   useEffect(() => {
@@ -213,43 +240,8 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
     };
   }, []);
 
-  // Load saved preferences
+  // Sync audio state with enabledSounds and isPaused
   useEffect(() => {
-    const savedMasterVolume = localStorage.getItem('ambientMasterVolume');
-    const savedIndividualVolumes = localStorage.getItem('ambientIndividualVolumes');
-    const savedEnabledSounds = localStorage.getItem('ambientEnabledSounds');
-    const savedTimerSync = localStorage.getItem('ambientSoundTimerSync');
-    const savedPaused = getManuallyPaused();
-    
-    if (savedMasterVolume) {
-      setMasterVolume(parseInt(savedMasterVolume, 10));
-    }
-    if (savedIndividualVolumes) {
-      try {
-        setIndividualVolumes(JSON.parse(savedIndividualVolumes));
-      } catch (e) {
-        console.error('Failed to parse individual volumes', e);
-      }
-    }
-    if (savedEnabledSounds) {
-      try {
-        const sounds = JSON.parse(savedEnabledSounds) as SoundType[];
-        setEnabledSounds(new Set(sounds));
-      } catch (e) {
-        console.error('Failed to parse enabled sounds', e);
-      }
-    }
-    if (savedTimerSync) {
-      setSoundTimerSync(savedTimerSync === 'true');
-    }
-    setIsPaused(savedPaused);
-    preferencesLoaded.current = true;
-  }, []);
-
-  // Sync audio state with enabledSounds and isPaused (only after preferences loaded)
-  useEffect(() => {
-    if (!preferencesLoaded.current) return;
-    
     SOUND_OPTIONS.forEach(sound => {
       const isEnabled = enabledSounds.has(sound.id);
       const isPlaying = audioManager.isPlaying(sound.id);
@@ -269,15 +261,11 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
       }
     });
     
-    if (preferencesLoaded.current) {
-      localStorage.setItem('ambientEnabledSounds', JSON.stringify(Array.from(enabledSounds)));
-    }
+    localStorage.setItem('ambientEnabledSounds', JSON.stringify(Array.from(enabledSounds)));
   }, [enabledSounds, isPaused]);
 
   // Update volumes
   useEffect(() => {
-    if (!preferencesLoaded.current) return;
-    
     SOUND_OPTIONS.forEach(sound => {
       const finalVolume = (masterVolume / 100) * (individualVolumes[sound.id] / 100);
       audioManager.setVolume(sound.id, finalVolume);
