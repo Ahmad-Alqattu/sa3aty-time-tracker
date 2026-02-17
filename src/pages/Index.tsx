@@ -80,8 +80,8 @@ export default function Index() {
         <TodaySummary />
       </section>
 
-      {/* Ambient Sounds - Mobile inline, Desktop in sidebar */}
-      <section className="px-6 mt-6 lg:hidden">
+      {/* Ambient Sounds - inline on home page for both mobile and desktop */}
+      <section className="px-6 mt-6">
         <AmbientSoundPlayer mode="inline" />
       </section>
     </div>

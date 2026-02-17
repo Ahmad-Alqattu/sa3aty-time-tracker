@@ -11,6 +11,7 @@ import {
   deleteEntryFromFirestore,
   bulkSyncToFirestore
 } from '@/lib/firestoreSync';
+import { pauseAllSounds, resumeAllSounds, getSoundTimerSyncEnabled } from '@/lib/audioManager';
 
 interface AppContextType {
   language: Language;
@@ -129,6 +130,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!activeEntry) return 'idle';
     return activeEntry.pauses.some(p => !p.pauseEnd) ? 'paused' : 'running';
   }, [activeEntry]);
+
+  // Sync sounds with timer state
+  const prevTimerStateRef = useRef<TimerState>(timerState);
+  useEffect(() => {
+    const prevState = prevTimerStateRef.current;
+    prevTimerStateRef.current = timerState;
+    
+    // Only sync if setting is enabled
+    if (!getSoundTimerSyncEnabled()) return;
+    
+    // Pause sounds when timer stops or pauses
+    if ((timerState === 'idle' || timerState === 'paused') && prevState === 'running') {
+      pauseAllSounds();
+    }
+    // Resume sounds when timer starts or resumes
+    else if (timerState === 'running' && (prevState === 'idle' || prevState === 'paused')) {
+      resumeAllSounds();
+    }
+  }, [timerState]);
 
   // Tick
   useEffect(() => {

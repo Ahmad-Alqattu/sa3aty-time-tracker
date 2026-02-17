@@ -22,81 +22,78 @@ export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-card border-e border-border">
-        <div className="flex flex-col flex-1 overflow-y-auto">
-          {/* Logo/Title */}
-          <div className="flex items-center justify-center gap-3 h-20 px-4 border-b border-border">
-            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="ساعتي" className="h-14 w-14 object-contain" />
-            <h1 className="text-xl font-bold text-primary">{t('appName')}</h1>
+    <div className="flex flex-col min-h-screen">
+      {/* Unified Header - Both Mobile and Desktop */}
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border">
+        <div className="flex items-center justify-between h-14 px-4 max-w-7xl mx-auto">
+          {/* Logo */}
+          <div className="flex items-center gap-2">
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="ساعتي" className="h-8 w-8 object-contain" />
+            <h1 className="text-lg font-bold text-primary">{t('appName')}</h1>
           </div>
 
-          {/* Navigation Links */}
-          <nav className="flex-1 px-4 py-6 space-y-2">
+          {/* Desktop Navigation - Center */}
+          <nav className="hidden lg:flex items-center gap-1">
             {links.map(link => (
               <RouterNavLink
                 key={link.to}
                 to={link.to}
                 end={link.to === '/'}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  `flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                     isActive
                       ? 'bg-primary text-primary-foreground font-semibold'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`
                 }
               >
-                <link.icon className="w-5 h-5" />
-                <span>{link.label}</span>
+                <link.icon className="w-4 h-4" />
+                <span className="text-sm">{link.label}</span>
               </RouterNavLink>
             ))}
           </nav>
 
-          {/* Ambient Sound Player in sidebar */}
-          <div className="px-4 pb-4">
-            <AmbientSoundPlayer mode="sidebar" />
-          </div>
-
-          {/* Bottom actions */}
-          <div className="px-4 py-4 border-t border-border space-y-2">
-            <button
+          {/* Right side actions */}
+          <div className="flex items-center gap-1">
+            {/* Language toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-              className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="h-9 w-9"
+              title={language === 'ar' ? 'English' : 'عربي'}
             >
               <Globe className="w-5 h-5" />
-              <span>{language === 'ar' ? 'English' : 'عربي'}</span>
-            </button>
-            <div className="flex items-center justify-between px-4">
-              <SyncStatus />
-              <UserMenu />
-            </div>
+            </Button>
+            
+            <SyncStatus />
+            <UserMenu />
           </div>
         </div>
-      </aside>
+      </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 lg:ms-64 overflow-auto">
-        {/* Mobile Header */}
-        <header className="lg:hidden sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border">
-          <div className="flex items-center justify-between h-14 px-4">
-            <div className="flex items-center gap-2">
-              <img src={`${import.meta.env.BASE_URL}logo.png`} alt="ساعتي" className="h-8 w-8 object-contain" />
-              <h1 className="text-lg font-bold text-primary">{t('appName')}</h1>
-            </div>
-            <div className="flex items-center gap-1">
-              <AmbientSoundPlayer mode="header-icon" />
-              <SyncStatus />
-              <UserMenu />
-            </div>
-          </div>
-        </header>
-        <div className="max-w-4xl mx-auto">
+      <main className="flex-1 overflow-auto">
+        <div className="max-w-4xl mx-auto pb-24 lg:pb-8">
           {children}
         </div>
       </main>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Desktop: Fixed top sounds on non-home pages */}
+      {!isHomePage && (
+        <div className="hidden lg:block">
+          <AmbientSoundPlayer mode="fixed-top" />
+        </div>
+      )}
+
+      {/* Mobile: Floating sounds on non-home pages */}
+      {!isHomePage && (
+        <div className="lg:hidden">
+          <AmbientSoundPlayer mode="floating" />
+        </div>
+      )}
+
+      {/* Mobile Bottom Navigation */}}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border safe-area-bottom">
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
           {links.map(link => (
@@ -116,13 +113,6 @@ export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
               <span className="text-[11px]">{link.label}</span>
             </RouterNavLink>
           ))}
-          <button
-            onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-            className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-colors min-w-[64px]"
-          >
-            <Globe className="w-5 h-5" />
-            <span className="text-[11px]">{language === 'ar' ? 'EN' : 'عربي'}</span>
-          </button>
         </div>
       </nav>
     </div>

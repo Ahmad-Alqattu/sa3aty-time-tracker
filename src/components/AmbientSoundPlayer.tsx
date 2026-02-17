@@ -1,21 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Volume2, VolumeX, Cloud, Flame, Waves, Coffee, Settings, RotateCcw } from 'lucide-react';
+import { Volume2, VolumeX, Cloud, Flame, Waves, Coffee, Settings, RotateCcw, ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { audioManager, SoundType, setManuallyPaused, getManuallyPaused } from '@/lib/audioManager';
 
-export type AmbientPlayerMode = 'inline' | 'floating' | 'sidebar' | 'header-icon';
+export type AmbientPlayerMode = 'inline' | 'floating' | 'sidebar' | 'header-icon' | 'side-panel' | 'fixed-top';
 
 interface AmbientSoundPlayerProps {
   mode?: AmbientPlayerMode;
   /** @deprecated Use mode instead */
   compact?: boolean;
 }
-
-type SoundType = 'rain' | 'fireplace' | 'waves' | 'cafe';
 
 interface SoundOption {
   id: SoundType;
@@ -66,22 +67,22 @@ function AudioVisualizer({ isActive }: { isActive: boolean }) {
   if (!isActive) return null;
   
   return (
-    <div className="flex items-end justify-center gap-0.5 h-3 absolute -top-2 left-1/2 -translate-x-1/2">
-      {[0, 1, 2, 3].map((i) => (
+    <div className="flex items-end justify-center gap-0.5 h-3 absolute bottom-1 left-1/2 -translate-x-1/2">
+      {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="w-0.5 rounded-full bg-white"
+          className="w-0.5 rounded-full bg-white/90"
           style={{
-            animation: `visualizer ${0.3 + i * 0.1}s ease-in-out infinite alternate`,
-            animationDelay: `${i * 0.08}s`,
-            height: '3px'
+            animation: `visualizer ${0.25 + i * 0.1}s ease-in-out infinite alternate`,
+            animationDelay: `${i * 0.06}s`,
+            height: '2px'
           }}
         />
       ))}
       <style>{`
         @keyframes visualizer {
-          0% { height: 3px; opacity: 0.6; }
-          100% { height: 12px; opacity: 1; }
+          0% { height: 2px; opacity: 0.5; }
+          100% { height: 8px; opacity: 1; }
         }
       `}</style>
     </div>
@@ -179,68 +180,6 @@ function MixerSlider({
   );
 }
 
-// Audio Manager - handles all audio operations
-class AudioManager {
-  private audioElements: Map<SoundType, HTMLAudioElement> = new Map();
-  private initialized = false;
-  
-  init(basePath: string) {
-    if (this.initialized) return;
-    
-    SOUND_OPTIONS.forEach(sound => {
-      const audio = new Audio(`${basePath}${sound.localPath}`);
-      audio.loop = true;
-      audio.preload = 'auto';
-      audio.volume = 0.5;
-      this.audioElements.set(sound.id, audio);
-    });
-    
-    this.initialized = true;
-  }
-  
-  play(soundId: SoundType) {
-    const audio = this.audioElements.get(soundId);
-    if (audio) {
-      audio.currentTime = audio.currentTime || 0;
-      const playPromise = audio.play();
-      if (playPromise) {
-        playPromise.catch(err => console.error(`Failed to play ${soundId}:`, err));
-      }
-    }
-  }
-  
-  pause(soundId: SoundType) {
-    const audio = this.audioElements.get(soundId);
-    if (audio) {
-      audio.pause();
-    }
-  }
-  
-  setVolume(soundId: SoundType, volume: number) {
-    const audio = this.audioElements.get(soundId);
-    if (audio) {
-      audio.volume = Math.max(0, Math.min(1, volume));
-    }
-  }
-  
-  isPlaying(soundId: SoundType): boolean {
-    const audio = this.audioElements.get(soundId);
-    return audio ? !audio.paused : false;
-  }
-  
-  cleanup() {
-    this.audioElements.forEach(audio => {
-      audio.pause();
-      audio.src = '';
-    });
-    this.audioElements.clear();
-    this.initialized = false;
-  }
-}
-
-// Singleton audio manager
-const audioManager = new AudioManager();
-
 export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }: AmbientSoundPlayerProps) {
   // Handle legacy compact prop
   const effectiveMode = compact ? 'floating' : mode;
@@ -253,8 +192,11 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
     cafe: 50
   });
   const [enabledSounds, setEnabledSounds] = useState<Set<SoundType>>(new Set());
+  const [isPaused, setIsPaused] = useState(false); // Paused state (keeps settings)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+  const [soundTimerSync, setSoundTimerSync] = useState(false);
   const isInitialized = useRef(false);
 
   // Initialize audio manager
@@ -275,6 +217,8 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
     const savedMasterVolume = localStorage.getItem('ambientMasterVolume');
     const savedIndividualVolumes = localStorage.getItem('ambientIndividualVolumes');
     const savedEnabledSounds = localStorage.getItem('ambientEnabledSounds');
+    const savedTimerSync = localStorage.getItem('ambientSoundTimerSync');
+    const savedPaused = getManuallyPaused();
     
     if (savedMasterVolume) {
       setMasterVolume(parseInt(savedMasterVolume, 10));
@@ -294,23 +238,35 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
         console.error('Failed to parse enabled sounds', e);
       }
     }
+    if (savedTimerSync) {
+      setSoundTimerSync(savedTimerSync === 'true');
+    }
+    setIsPaused(savedPaused);
   }, []);
 
-  // Sync audio state with enabledSounds
+  // Sync audio state with enabledSounds and isPaused
   useEffect(() => {
     SOUND_OPTIONS.forEach(sound => {
       const isEnabled = enabledSounds.has(sound.id);
       const isPlaying = audioManager.isPlaying(sound.id);
       
-      if (isEnabled && !isPlaying) {
-        audioManager.play(sound.id);
-      } else if (!isEnabled && isPlaying) {
-        audioManager.pause(sound.id);
+      if (isPaused) {
+        // If paused, stop all sounds
+        if (isPlaying) {
+          audioManager.pause(sound.id);
+        }
+      } else {
+        // If not paused, play enabled sounds
+        if (isEnabled && !isPlaying) {
+          audioManager.play(sound.id);
+        } else if (!isEnabled && isPlaying) {
+          audioManager.pause(sound.id);
+        }
       }
     });
     
     localStorage.setItem('ambientEnabledSounds', JSON.stringify(Array.from(enabledSounds)));
-  }, [enabledSounds]);
+  }, [enabledSounds, isPaused]);
 
   // Update volumes
   useEffect(() => {
@@ -353,9 +309,27 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
     });
   }, [masterVolume]);
 
+  const toggleTimerSync = useCallback(() => {
+    setSoundTimerSync(prev => {
+      const newValue = !prev;
+      localStorage.setItem('ambientSoundTimerSync', newValue.toString());
+      return newValue;
+    });
+  }, []);
+
   // Settings content
   const SettingsContent = () => (
     <div className="space-y-4">
+      <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
+        <Label htmlFor="timer-sync" className="text-sm cursor-pointer">
+          إيقاف/تشغيل مع المؤقت
+        </Label>
+        <Switch
+          id="timer-sync"
+          checked={soundTimerSync}
+          onCheckedChange={toggleTimerSync}
+        />
+      </div>
       <div className="flex justify-end">
         <Button
           variant="ghost"
@@ -382,15 +356,35 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
     </div>
   );
 
-  // Mute all sounds
-  const muteAll = useCallback(() => {
-    enabledSounds.forEach(soundId => {
-      audioManager.pause(soundId);
+  // Pause all sounds (keeps settings)
+  const pauseAll = useCallback(() => {
+    setIsPaused(true);
+    setManuallyPaused(true);
+    SOUND_OPTIONS.forEach(sound => {
+      audioManager.pause(sound.id);
     });
-    setEnabledSounds(new Set());
+  }, []);
+
+  // Resume all sounds
+  const resumeAll = useCallback(() => {
+    setIsPaused(false);
+    setManuallyPaused(false);
+    enabledSounds.forEach(soundId => {
+      audioManager.play(soundId);
+    });
   }, [enabledSounds]);
 
+  // Toggle pause state
+  const togglePause = useCallback(() => {
+    if (isPaused) {
+      resumeAll();
+    } else {
+      pauseAll();
+    }
+  }, [isPaused, pauseAll, resumeAll]);
+
   const hasActiveSounds = enabledSounds.size > 0;
+  const isPlaying = hasActiveSounds && !isPaused;
 
   // Header icon mode - just a toggle button
   if (effectiveMode === 'header-icon') {
@@ -444,27 +438,34 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
     );
   }
 
-  // Inline mode - scrollable with the page, with mute button
+  // Inline mode - scrollable with the page, with glass effect
   if (effectiveMode === 'inline') {
     return (
-      <div className="bg-muted/50 rounded-2xl p-4 space-y-4">
+      <div 
+        className="rounded-2xl p-4 space-y-4 border border-white/20"
+        style={{
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-muted-foreground">أصوات محيطة</span>
+          <span className="text-sm font-medium">أصوات محيطة</span>
           <div className="flex items-center gap-1">
             {hasActiveSounds && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={muteAll}
-                className="h-8 px-2 text-xs gap-1"
+                onClick={togglePause}
+                className="h-8 px-2 text-xs gap-1 hover:bg-white/20"
               >
-                <VolumeX className="h-4 w-4" />
-                إيقاف
+                {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                {isPaused ? 'استئناف' : 'إيقاف'}
               </Button>
             )}
             <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/20">
                   <Settings className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
@@ -588,6 +589,113 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
     );
   }
 
+  // Side panel mode - glass effect panel on the side for desktop
+  if (effectiveMode === 'side-panel') {
+    return (
+      <div 
+        className={cn(
+          "fixed end-0 top-1/2 -translate-y-1/2 z-40 transition-all duration-300",
+          isPanelCollapsed ? "translate-x-[calc(100%-3rem)]" : ""
+        )}
+      >
+        <div 
+          className="flex"
+          style={{
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+          }}
+        >
+          {/* Collapse toggle */}
+          <button
+            onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
+            className="flex items-center justify-center w-12 h-24 bg-white/10 hover:bg-white/20 border-s border-white/20 rounded-s-2xl transition-colors"
+          >
+            {isPanelCollapsed ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+            {hasActiveSounds && isPanelCollapsed && (
+              <span className="absolute top-2 end-2 w-2 h-2 bg-primary rounded-full animate-pulse" />
+            )}
+          </button>
+          
+          {/* Panel content */}
+          <div 
+            className={cn(
+              "flex flex-col gap-4 p-4 border border-white/20 border-e-0 rounded-s-2xl",
+              "bg-gradient-to-br from-white/15 to-white/5",
+              "shadow-[0_8px_32px_rgba(0,0,0,0.12)]"
+            )}
+            style={{ minWidth: '280px' }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">أصوات محيطة</span>
+              <div className="flex items-center gap-1">
+                {hasActiveSounds && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={togglePause}
+                    className="h-8 w-8 hover:bg-white/20"
+                    title={isPaused ? 'استئناف' : 'إيقاف الكل'}
+                  >
+                    {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                  </Button>
+                )}
+                <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/20">
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="text-center">مكسر الأصوات</DialogTitle>
+                    </DialogHeader>
+                    <SettingsContent />
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap justify-center gap-2">
+              {SOUND_OPTIONS.map(sound => (
+                <SoundButton
+                  key={sound.id}
+                  sound={sound}
+                  isEnabled={enabledSounds.has(sound.id)}
+                  onToggle={() => toggleSound(sound.id)}
+                />
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-white/70">
+                <span>مستوى الصوت</span>
+                <span className="font-mono">{masterVolume}%</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <VolumeX className="h-4 w-4 text-white/70" />
+                <Slider
+                  value={[masterVolume]}
+                  onValueChange={(values) => setMasterVolume(values[0])}
+                  max={100}
+                  step={1}
+                  className="flex-1"
+                />
+                <Volume2 className="h-4 w-4 text-white/70" />
+              </div>
+            </div>
+
+            {hasActiveSounds && (
+              <div className="text-center text-xs text-white/70">
+                {enabledSounds.size} صوت مفعّل
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Sidebar/Desktop version (default)
   return (
     <div className="p-4 bg-muted/50 rounded-xl space-y-4">
@@ -598,11 +706,11 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
             <Button
               variant="ghost"
               size="icon"
-              onClick={muteAll}
+              onClick={togglePause}
               className="h-8 w-8"
-              title="إيقاف الكل"
+              title={isPaused ? 'استئناف' : 'إيقاف الكل'}
             >
-              <VolumeX className="h-4 w-4" />
+              {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
             </Button>
           )}
           <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
