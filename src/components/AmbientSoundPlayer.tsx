@@ -7,7 +7,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
+export type AmbientPlayerMode = 'inline' | 'floating' | 'sidebar' | 'header-icon';
+
 interface AmbientSoundPlayerProps {
+  mode?: AmbientPlayerMode;
+  /** @deprecated Use mode instead */
   compact?: boolean;
 }
 
@@ -237,7 +241,10 @@ class AudioManager {
 // Singleton audio manager
 const audioManager = new AudioManager();
 
-export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlayerProps) {
+export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }: AmbientSoundPlayerProps) {
+  // Handle legacy compact prop
+  const effectiveMode = compact ? 'floating' : mode;
+  
   const [masterVolume, setMasterVolume] = useState(50);
   const [individualVolumes, setIndividualVolumes] = useState<Record<SoundType, number>>({
     rain: 50,
@@ -247,6 +254,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
   });
   const [enabledSounds, setEnabledSounds] = useState<Set<SoundType>>(new Set());
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const isInitialized = useRef(false);
 
   // Initialize audio manager
@@ -374,36 +382,93 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
     </div>
   );
 
-  // Compact version for mobile - iOS 26 Liquid Glass Style
-  if (compact) {
+  // Mute all sounds
+  const muteAll = useCallback(() => {
+    enabledSounds.forEach(soundId => {
+      audioManager.pause(soundId);
+    });
+    setEnabledSounds(new Set());
+  }, [enabledSounds]);
+
+  const hasActiveSounds = enabledSounds.size > 0;
+
+  // Header icon mode - just a toggle button
+  if (effectiveMode === 'header-icon') {
     return (
-      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40">
-        <div className="flex flex-col items-center gap-3 bg-white/15 backdrop-blur-3xl rounded-3xl p-4 shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/30"
-          style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.3)'
-          }}>
-          <div className="flex items-center gap-2">
-            {SOUND_OPTIONS.map(sound => (
-              <SoundButton
-                key={sound.id}
-                sound={sound}
-                isEnabled={enabledSounds.has(sound.id)}
-                onToggle={() => toggleSound(sound.id)}
+      <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <SheetTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "relative h-9 w-9 rounded-lg",
+              hasActiveSounds && "text-primary"
+            )}
+          >
+            {hasActiveSounds ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+            {hasActiveSounds && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full animate-pulse" />
+            )}
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="bottom" className="rounded-t-3xl pb-safe">
+          <SheetHeader className="pb-4">
+            <SheetTitle className="text-center">أصوات محيطة</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4">
+            <div className="flex justify-center gap-2">
+              {SOUND_OPTIONS.map(sound => (
+                <SoundButton
+                  key={sound.id}
+                  sound={sound}
+                  isEnabled={enabledSounds.has(sound.id)}
+                  onToggle={() => toggleSound(sound.id)}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <VolumeX className="h-4 w-4 text-muted-foreground" />
+              <Slider
+                value={[masterVolume]}
+                onValueChange={(values) => setMasterVolume(values[0])}
+                max={100}
+                step={1}
+                className="flex-1"
               />
-            ))}
-            
+              <Volume2 className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <SettingsContent />
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  // Inline mode - scrollable with the page, with mute button
+  if (effectiveMode === 'inline') {
+    return (
+      <div className="bg-muted/50 rounded-2xl p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-muted-foreground">أصوات محيطة</span>
+          <div className="flex items-center gap-1">
+            {hasActiveSounds && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={muteAll}
+                className="h-8 px-2 text-xs gap-1"
+              >
+                <VolumeX className="h-4 w-4" />
+                إيقاف
+              </Button>
+            )}
             <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
               <SheetTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-12 w-12 rounded-2xl bg-white/20 hover:bg-white/30 border border-white/20 transition-all"
-                >
-                  <Settings className="h-5 w-5" />
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Settings className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="bottom" className="rounded-t-3xl">
+              <SheetContent side="bottom" className="rounded-t-3xl pb-safe">
                 <SheetHeader className="pb-4">
                   <SheetTitle className="text-center">مكسر الأصوات</SheetTitle>
                 </SheetHeader>
@@ -411,42 +476,149 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
               </SheetContent>
             </Sheet>
           </div>
+        </div>
 
-          <div className="flex items-center gap-2 w-full px-1">
-            <VolumeX className="h-4 w-4 text-white/70 shrink-0" />
-            <Slider
-              value={[masterVolume]}
-              onValueChange={(values) => setMasterVolume(values[0])}
-              max={100}
-              step={1}
-              className="flex-1"
+        <div className="flex justify-center gap-2">
+          {SOUND_OPTIONS.map(sound => (
+            <SoundButton
+              key={sound.id}
+              sound={sound}
+              isEnabled={enabledSounds.has(sound.id)}
+              onToggle={() => toggleSound(sound.id)}
             />
-            <Volume2 className="h-4 w-4 text-white/70 shrink-0" />
-          </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <VolumeX className="h-4 w-4 text-muted-foreground" />
+          <Slider
+            value={[masterVolume]}
+            onValueChange={(values) => setMasterVolume(values[0])}
+            max={100}
+            step={1}
+            className="flex-1"
+          />
+          <Volume2 className="h-4 w-4 text-muted-foreground" />
         </div>
       </div>
     );
   }
 
-  // Desktop version
+  // Floating mode (collapsible) for mobile on other pages
+  if (effectiveMode === 'floating') {
+    return (
+      <div className="fixed bottom-20 end-4 z-40">
+        {isCollapsed ? (
+          // Collapsed state - just a small button
+          <Button
+            onClick={() => setIsCollapsed(false)}
+            size="icon"
+            className={cn(
+              "h-12 w-12 rounded-full shadow-lg",
+              hasActiveSounds && "bg-primary"
+            )}
+          >
+            {hasActiveSounds ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+            {hasActiveSounds && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+            )}
+          </Button>
+        ) : (
+          // Expanded state
+          <div 
+            className="flex flex-col items-center gap-3 bg-white/15 backdrop-blur-3xl rounded-3xl p-4 shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/30"
+            style={{
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.3)'
+            }}
+          >
+            {/* Collapse button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCollapsed(true)}
+              className="absolute -top-2 -end-2 h-6 w-6 rounded-full bg-muted p-0 text-xs"
+            >
+              ×
+            </Button>
+            
+            <div className="flex items-center gap-2">
+              {SOUND_OPTIONS.map(sound => (
+                <SoundButton
+                  key={sound.id}
+                  sound={sound}
+                  isEnabled={enabledSounds.has(sound.id)}
+                  onToggle={() => toggleSound(sound.id)}
+                />
+              ))}
+              
+              <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-12 w-12 rounded-2xl bg-white/20 hover:bg-white/30 border border-white/20 transition-all"
+                  >
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="rounded-t-3xl">
+                  <SheetHeader className="pb-4">
+                    <SheetTitle className="text-center">مكسر الأصوات</SheetTitle>
+                  </SheetHeader>
+                  <SettingsContent />
+                </SheetContent>
+              </Sheet>
+            </div>
+
+            <div className="flex items-center gap-2 w-full px-1">
+              <VolumeX className="h-4 w-4 text-white/70 shrink-0" />
+              <Slider
+                value={[masterVolume]}
+                onValueChange={(values) => setMasterVolume(values[0])}
+                max={100}
+                step={1}
+                className="flex-1"
+              />
+              <Volume2 className="h-4 w-4 text-white/70 shrink-0" />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Sidebar/Desktop version (default)
   return (
     <div className="p-4 bg-muted/50 rounded-xl space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">أصوات محيطة</span>
-        
-        <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Settings className="h-4 w-4" />
+        <div className="flex items-center gap-1">
+          {hasActiveSounds && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={muteAll}
+              className="h-8 w-8"
+              title="إيقاف الكل"
+            >
+              <VolumeX className="h-4 w-4" />
             </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-center">مكسر الأصوات</DialogTitle>
-            </DialogHeader>
-            <SettingsContent />
-          </DialogContent>
-        </Dialog>
+          )}
+          <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Settings className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-center">مكسر الأصوات</DialogTitle>
+              </DialogHeader>
+              <SettingsContent />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
       
       <div className="flex justify-center gap-2">
@@ -478,7 +650,7 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
         </div>
       </div>
 
-      {enabledSounds.size > 0 && (
+      {hasActiveSounds && (
         <div className="text-center text-xs text-muted-foreground">
           {enabledSounds.size} صوت مفعّل
         </div>

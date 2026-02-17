@@ -1,9 +1,10 @@
 import { ReactNode } from 'react';
-import { NavLink as RouterNavLink } from 'react-router-dom';
+import { NavLink as RouterNavLink, useLocation } from 'react-router-dom';
 import { Home, Clock, FolderOpen, Globe } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import AmbientSoundPlayer from './AmbientSoundPlayer';
 import UserMenu, { SyncStatus } from './UserMenu';
+import { Button } from '@/components/ui/button';
 
 interface ResponsiveLayoutProps {
   children: ReactNode;
@@ -11,6 +12,8 @@ interface ResponsiveLayoutProps {
 
 export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
   const { t, language, setLanguage } = useApp();
+  const location = useLocation();
+  const isHomePage = location.pathname === '/';
 
   const links = [
     { to: '/', icon: Home, label: t('home') },
@@ -50,7 +53,12 @@ export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
             ))}
           </nav>
 
-          {/* Language Toggle */}
+          {/* Ambient Sound Player in sidebar */}
+          <div className="px-4 pb-4">
+            <AmbientSoundPlayer mode="sidebar" />
+          </div>
+
+          {/* Bottom actions */}
           <div className="px-4 py-4 border-t border-border space-y-2">
             <button
               onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
@@ -64,11 +72,6 @@ export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
               <UserMenu />
             </div>
           </div>
-
-          {/* Ambient Sound Player */}
-          <div className="px-4 pb-4">
-            <AmbientSoundPlayer />
-          </div>
         </div>
       </aside>
 
@@ -81,7 +84,8 @@ export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
               <img src={`${import.meta.env.BASE_URL}logo.png`} alt="ساعتي" className="h-8 w-8 object-contain" />
               <h1 className="text-lg font-bold text-primary">{t('appName')}</h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <AmbientSoundPlayer mode="header-icon" />
               <SyncStatus />
               <UserMenu />
             </div>
@@ -121,11 +125,6 @@ export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
           </button>
         </div>
       </nav>
-
-      {/* Mobile Ambient Sound Player - Floating */}
-      <div className="lg:hidden fixed bottom-20 end-4 z-40">
-        <AmbientSoundPlayer compact />
-      </div>
     </div>
   );
 }

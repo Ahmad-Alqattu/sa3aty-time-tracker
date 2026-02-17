@@ -4,6 +4,7 @@ import TodaySummary from '@/components/TodaySummary';
 import ForgotStartSheet from '@/components/ForgotStartSheet';
 import ForgotPauseSheet from '@/components/ForgotPauseSheet';
 import ForgotStopSheet from '@/components/ForgotStopSheet';
+import AmbientSoundPlayer from '@/components/AmbientSoundPlayer';
 import { Plus } from 'lucide-react';
 
 export default function Index() {
@@ -11,7 +12,7 @@ export default function Index() {
 
   return (
     <div className="min-h-screen pb-24 pt-safe">
-      <header className="px-6 pt-8 pb-4">
+      <header className="px-6 pt-8 pb-4 lg:hidden">
         <h1 className="text-2xl font-bold text-foreground">{t('appName')}</h1>
       </header>
 
@@ -77,6 +78,11 @@ export default function Index() {
 
       <section className="px-6 mt-6">
         <TodaySummary />
+      </section>
+
+      {/* Ambient Sounds - Mobile inline, Desktop in sidebar */}
+      <section className="px-6 mt-6 lg:hidden">
+        <AmbientSoundPlayer mode="inline" />
       </section>
     </div>
   );
