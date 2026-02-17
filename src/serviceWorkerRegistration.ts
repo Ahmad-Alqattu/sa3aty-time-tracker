@@ -6,6 +6,11 @@ export function register() {
         .register(swUrl)
         .then((registration) => {
           console.log('SW registered: ', registration);
+
+          registration.update().catch(() => undefined);
+          window.addEventListener('focus', () => {
+            registration.update().catch(() => undefined);
+          });
         })
         .catch((registrationError) => {
           console.log('SW registration failed: ', registrationError);
