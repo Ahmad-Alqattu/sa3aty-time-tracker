@@ -24,7 +24,7 @@ export default function ResponsiveLayout({ children }: ResponsiveLayoutProps) {
         <div className="flex flex-col flex-1 overflow-y-auto">
           {/* Logo/Title */}
           <div className="flex items-center justify-center gap-3 h-20 px-4 border-b border-border">
-            <img src="/logo.png" alt="ساعتي" className="h-14 w-14 object-contain" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="ساعتي" className="h-14 w-14 object-contain" />
             <h1 className="text-xl font-bold text-primary">{t('appName')}</h1>
           </div>
 

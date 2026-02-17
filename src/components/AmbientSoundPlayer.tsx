@@ -252,8 +252,8 @@ export default function AmbientSoundPlayer({ compact = false }: AmbientSoundPlay
   // Initialize audio manager
   useEffect(() => {
     if (!isInitialized.current) {
-      const basePath = import.meta.env.PROD ? '/sa3aty-time-tracker' : '';
-      audioManager.init(basePath);
+      const basePath = import.meta.env.BASE_URL || '/';
+      audioManager.init(basePath.endsWith('/') ? basePath.slice(0, -1) : basePath);
       isInitialized.current = true;
     }
     
