@@ -198,6 +198,7 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const [soundTimerSync, setSoundTimerSync] = useState(false);
   const isInitialized = useRef(false);
+  const preferencesLoaded = useRef(false);
 
   // Initialize audio manager
   useEffect(() => {
@@ -242,10 +243,13 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
       setSoundTimerSync(savedTimerSync === 'true');
     }
     setIsPaused(savedPaused);
+    preferencesLoaded.current = true;
   }, []);
 
-  // Sync audio state with enabledSounds and isPaused
+  // Sync audio state with enabledSounds and isPaused (only after preferences loaded)
   useEffect(() => {
+    if (!preferencesLoaded.current) return;
+    
     SOUND_OPTIONS.forEach(sound => {
       const isEnabled = enabledSounds.has(sound.id);
       const isPlaying = audioManager.isPlaying(sound.id);
@@ -265,11 +269,15 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
       }
     });
     
-    localStorage.setItem('ambientEnabledSounds', JSON.stringify(Array.from(enabledSounds)));
+    if (preferencesLoaded.current) {
+      localStorage.setItem('ambientEnabledSounds', JSON.stringify(Array.from(enabledSounds)));
+    }
   }, [enabledSounds, isPaused]);
 
   // Update volumes
   useEffect(() => {
+    if (!preferencesLoaded.current) return;
+    
     SOUND_OPTIONS.forEach(sound => {
       const finalVolume = (masterVolume / 100) * (individualVolumes[sound.id] / 100);
       audioManager.setVolume(sound.id, finalVolume);
@@ -516,11 +524,11 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
             size="icon"
             className={cn(
               "h-12 w-12 rounded-full shadow-lg",
-              hasActiveSounds && "bg-primary"
+              isPlaying && "bg-primary"
             )}
           >
-            {hasActiveSounds ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-            {hasActiveSounds && (
+            {isPlaying ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+            {isPlaying && (
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
             )}
           </Button>
@@ -544,6 +552,19 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
             </Button>
             
             <div className="flex items-center gap-2">
+              {/* Pause/Play button */}
+              {hasActiveSounds && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={togglePause}
+                  className="h-12 w-12 rounded-2xl bg-white/20 hover:bg-white/30 border border-white/20 transition-all"
+                  title={isPaused ? 'استئناف' : 'إيقاف'}
+                >
+                  {isPaused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
+                </Button>
+              )}
+              
               {SOUND_OPTIONS.map(sound => (
                 <SoundButton
                   key={sound.id}
