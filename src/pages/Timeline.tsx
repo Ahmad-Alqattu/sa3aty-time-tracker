@@ -80,22 +80,22 @@ export default function Timeline() {
       const mins = durationMin % 60;
       
       return {
-        'المشروع': project?.name || 'بدون مشروع',
-        'التاريخ': start.toLocaleDateString('ar-SA'),
-        'البداية': start.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
-        'النهاية': end ? end.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : 'جاري',
-        'المدة (دقائق)': durationMin,
-        'المدة': `${hours}:${mins.toString().padStart(2, '0')}`,
-        'فترات التوقف': e.pauses.length,
-        'ملاحظات': e.note || ''
+        [t('projectName')]: project?.name || t('noProject'),
+        [t('date')]: start.toLocaleDateString(),
+        [t('startTime')]: start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        [t('endTime')]: end ? end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('ongoing'),
+        [t('durationMins')]: durationMin,
+        [t('duration')]: `${hours}:${mins.toString().padStart(2, '0')}`,
+        [t('pausesCount')]: e.pauses.length,
+        [t('note')]: e.note || ''
       };
     });
 
     // Calculate totals by project
     const projectTotals: Record<string, number> = {};
     data.forEach(row => {
-      const project = row['المشروع'];
-      projectTotals[project] = (projectTotals[project] || 0) + row['المدة (دقائق)'];
+      const project = row[t('projectName')] as string;
+      projectTotals[project] = (projectTotals[project] || 0) + (row[t('durationMins')] as number);
     });
 
     // Create workbook
@@ -116,17 +116,17 @@ export default function Timeline() {
       { wch: 30 },  // ملاحظات
     ];
 
-    XLSX.utils.book_append_sheet(wb, ws, 'السجلات');
+    XLSX.utils.book_append_sheet(wb, ws, t('timeline'));
 
     // Summary sheet
     const summaryData = Object.entries(projectTotals).map(([project, minutes]) => {
       const hours = Math.floor(minutes / 60);
       const mins = minutes % 60;
       return {
-        'المشروع': project,
-        'إجمالي الدقائق': minutes,
-        'إجمالي الوقت': `${hours}:${mins.toString().padStart(2, '0')}`,
-        'إجمالي الساعات': (minutes / 60).toFixed(2)
+        [t('projectName')]: project,
+        [t('totalMinutes')]: minutes,
+        [t('totalTime')]: `${hours}:${mins.toString().padStart(2, '0')}`,
+        [t('totalHours')]: (minutes / 60).toFixed(2)
       };
     });
     
@@ -135,10 +135,10 @@ export default function Timeline() {
     const grandHours = Math.floor(grandTotal / 60);
     const grandMins = grandTotal % 60;
     summaryData.push({
-      'المشروع': '📊 الإجمالي الكلي',
-      'إجمالي الدقائق': grandTotal,
-      'إجمالي الوقت': `${grandHours}:${grandMins.toString().padStart(2, '0')}`,
-      'إجمالي الساعات': (grandTotal / 60).toFixed(2)
+      [t('projectName')]: t('grandTotal'),
+      [t('totalMinutes')]: grandTotal,
+      [t('totalTime')]: `${grandHours}:${grandMins.toString().padStart(2, '0')}`,
+      [t('totalHours')]: (grandTotal / 60).toFixed(2)
     });
 
     const summaryWs = XLSX.utils.json_to_sheet(summaryData);
@@ -149,7 +149,8 @@ export default function Timeline() {
       { wch: 15 },
     ];
     
-    XLSX.utils.book_append_sheet(wb, summaryWs, 'ملخص');
+    // Fallback to "Summary" for sheet name if no translation matches exactly
+    XLSX.utils.book_append_sheet(wb, summaryWs, t('todayTotal'));
 
     // Export file
     XLSX.writeFile(wb, `sa3aty-${fromDate}_${toDate}.xlsx`);

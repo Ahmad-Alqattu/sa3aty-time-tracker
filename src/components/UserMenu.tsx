@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { LogIn, LogOut, User, Cloud, CloudOff } from 'lucide-react';
 import {
@@ -12,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export default function UserMenu() {
   const { user, loading, signInWithGoogle, signOut } = useAuth();
+  const { t } = useApp();
 
   if (loading) {
     return (
@@ -30,7 +32,7 @@ export default function UserMenu() {
         className="gap-2 rounded-full"
       >
         <LogIn className="h-4 w-4" />
-        <span className="hidden sm:inline">تسجيل الدخول</span>
+        <span className="hidden sm:inline">{t('login')}</span>
       </Button>
     );
   }
@@ -61,12 +63,12 @@ export default function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem className="gap-2 text-green-600">
           <Cloud className="h-4 w-4" />
-          <span>متزامن مع السحابة</span>
+          <span>{t('syncedWithCloud')}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut} className="gap-2 text-destructive">
           <LogOut className="h-4 w-4" />
-          <span>تسجيل الخروج</span>
+          <span>{t('logout')}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -75,12 +77,13 @@ export default function UserMenu() {
 
 export function SyncStatus() {
   const { user } = useAuth();
+  const { t } = useApp();
   
   if (!user) {
     return (
       <div className="flex items-center gap-1 text-xs text-muted-foreground">
         <CloudOff className="h-3 w-3" />
-        <span>محلي فقط</span>
+        <span>{t('localOnly')}</span>
       </div>
     );
   }
@@ -88,7 +91,7 @@ export function SyncStatus() {
   return (
     <div className="flex items-center gap-1 text-xs text-green-600">
       <Cloud className="h-3 w-3" />
-      <span>متزامن</span>
+      <span>{t('synced')}</span>
     </div>
   );
 }

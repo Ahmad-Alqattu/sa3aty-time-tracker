@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { audioManager, SoundType, setManuallyPaused, getManuallyPaused } from '@/lib/audioManager';
+import { useApp } from '@/contexts/AppContext';
 
 export type AmbientPlayerMode = 'inline' | 'floating' | 'sidebar' | 'header-icon' | 'side-panel' | 'fixed-top';
 
@@ -211,6 +212,7 @@ function loadInitialState() {
 }
 
 export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }: AmbientSoundPlayerProps) {
+  const { t, language } = useApp();
   // Handle legacy compact prop
   const effectiveMode = compact ? 'floating' : mode;
   
@@ -318,7 +320,7 @@ export default function AmbientSoundPlayer({ mode = 'sidebar', compact = false }
     <div className="space-y-4">
       <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
         <Label htmlFor="timer-sync" className="text-sm cursor-pointer">
-          إيقاف/تشغيل مع المؤقت
+          {t('syncWithTimer')}
         </Label>
         <Switch
           id="timer-sync"

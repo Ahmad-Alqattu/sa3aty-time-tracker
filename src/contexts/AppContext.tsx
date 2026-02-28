@@ -81,6 +81,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       setIsSynced(false);
       hasMigratedRef.current = false;
+      
+      // Reset state to empty/local for guest
+      setProjects(loadJson<Project[]>('sa3aty-projects', []));
+      setEntries(loadJson<TimeEntry[]>('sa3aty-entries', []));
       return;
     }
 
@@ -95,6 +99,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         try {
           await bulkSyncToFirestore(user.uid, localProjects, localEntries);
           console.log('Migrated local data to Firestore');
+          localStorage.removeItem('sa3aty-projects');
+          localStorage.removeItem('sa3aty-entries');
         } catch (error) {
           console.error('Failed to migrate data:', error);
         }
@@ -312,23 +318,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
-    const entry: TimeEntry = {
-      id: crypto.randomUUID(),
-      projectId,
-      startAt: startAt.toISOString(),
-      endAt: endAt?.toISOString(),
-      pauses: [],
-      note: note?.trim(),
-      source: 'retro',
-      createdAt: new Date().toISOString(),
-    };
-    setEntries(prev => [...prev, entry]);
-    if (user) syncEntryToFirestore(user.uid, entry).catch(console.error);
+    setEntries(prev => {
+      let updatedEntries = [...prev];
+      
+      // If creating a new running entry, stop any existing running entry
+      if (!endAt) {
+        updatedEntries = updatedEntries.map(e => {
+          if (!e.endAt) {
+            const stoppedEntry = {
+              ...e,
+              endAt: startAt.toISOString() // End the previous one when this new one started
+            };
+            if (user) syncEntryToFirestore(user.uid, stoppedEntry).catch(console.error);
+            return stoppedEntry;
+          }
+          return e;
+        });
+      }
+
+      const entry: TimeEntry = {
+        id: crypto.randomUUID(),
+        projectId,
+        startAt: startAt.toISOString(),
+        endAt: endAt?.toISOString(),
+        pauses: [],
+        note: note?.trim(),
+        source: 'retro',
+        createdAt: new Date().toISOString(),
+      };
+      
+      if (user) syncEntryToFirestore(user.uid, entry).catch(console.error);
+      return [...updatedEntries, entry];
+    });
   }, [user]);
 
   const fixForgotPause = useCallback((minutesAgo: number, action: 'end' | 'resume') => {
     if (!activeEntry) return;
-    const pauseStart = new Date(Date.now() - minutesAgo * 60000);
+    
+    const startAtTime = new Date(activeEntry.startAt).getTime();
+    const desiredPauseStartTime = Date.now() - minutesAgo * 60000;
+    
+    // Ensure pause doesn't start before the entry itself started
+    const pauseStart = new Date(Math.max(desiredPauseStartTime, startAtTime));
     const now = new Date();
 
     const newPause: TimePause = {
@@ -351,12 +382,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const fixForgotStop = useCallback((minutesAgo: number) => {
     if (!activeEntry) return;
-    const endTime = new Date(Date.now() - minutesAgo * 60000);
+    
+    const startAtTime = new Date(activeEntry.startAt).getTime();
+    const desiredEndTime = Date.now() - minutesAgo * 60000;
+    
+    // Ensure end time is not before start time
+    const endTime = new Date(Math.max(desiredEndTime, startAtTime));
+    
     const updatedEntry = {
       ...activeEntry,
-      pauses: activeEntry.pauses.map(p =>
-        p.pauseEnd ? p : { ...p, pauseEnd: endTime.toISOString() }
-      ),
+      pauses: activeEntry.pauses.map(p => {
+        if (!p.pauseEnd) return { ...p, pauseEnd: endTime.toISOString() };
+        // If an existing pause happened after our new end time, cap it to the new end time
+        if (new Date(p.pauseStart).getTime() > endTime.getTime()) {
+           return { ...p, pauseStart: endTime.toISOString(), pauseEnd: endTime.toISOString() }; // basically zero duration
+        }
+        if (new Date(p.pauseEnd).getTime() > endTime.getTime()) {
+           return { ...p, pauseEnd: endTime.toISOString() };
+        }
+        return p;
+      }),
       endAt: endTime.toISOString()
     };
     setEntries(prev => prev.map(e => e.id === activeEntry.id ? updatedEntry : e));
